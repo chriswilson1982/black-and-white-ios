@@ -5,6 +5,7 @@ struct ContentView: View {
     @State private var coordinator = GameCoordinator()
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Frame rate, draw calls, quads and node count in the bottom corner, for performance checks.
     /// Debug builds only: release builds never show them.
@@ -44,6 +45,20 @@ struct ContentView: View {
                                debugOptions: Self.debugOptions)
                         .ignoresSafeArea()
                         .transition(.opacity)
+                }
+                if let summary = coordinator.roundSummary, !coordinator.showingHome {
+                    RoundSummaryCard(summary: summary, settings: coordinator.effectiveSettings) {
+                        coordinator.dismissRoundSummary()
+                    }
+                    .id(summary.id)
+                    .transition(.roundSummary(reduceMotion: reduceMotion))
+                }
+                if let summary = coordinator.gameOverSummary, !coordinator.showingHome {
+                    GameOverCard(summary: summary, settings: coordinator.effectiveSettings) {
+                        coordinator.dismissGameOverSummary()
+                    }
+                    .id(summary.id)
+                    .transition(.roundSummary(reduceMotion: reduceMotion))
                 }
             }
             .onAppear {
@@ -88,14 +103,6 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $coordinator.showingTutorial,
                          onDismiss: { coordinator.tutorialDismissed() }) {
             TutorialView(settings: coordinator.effectiveSettings) { coordinator.finishTutorial() }
-        }
-        .alert(coordinator.announcement?.title ?? "",
-               isPresented: Binding(get: { coordinator.announcement != nil },
-                                    set: { if !$0 { coordinator.announcement = nil } }),
-               presenting: coordinator.announcement) { _ in
-            Button("OK") {}
-        } message: { announcement in
-            Text(announcement.message)
         }
     }
 }

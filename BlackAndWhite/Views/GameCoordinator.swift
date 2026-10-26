@@ -10,12 +10,6 @@ final class GameCoordinator: GameSceneDelegate {
         var id: String { rawValue }
     }
 
-    struct Announcement: Identifiable {
-        let id = UUID()
-        let title: String
-        let message: String
-    }
-
     var settings: GameSettings
     /// The phone is in dark mode (used when Appearance is Automatic).
     var systemIsDark = false
@@ -28,10 +22,13 @@ final class GameCoordinator: GameSceneDelegate {
     var mood: GameMood = .playing
     /// Goes up each round, so the background shuffles where its colours sit.
     var backgroundShuffle = 0
+    /// The won round's score breakdown, while its card is showing.
+    var roundSummary: RoundSummary?
+    /// How the game ended, while the game-over card is showing.
+    var gameOverSummary: GameOverSummary?
 
     var activeSheet: Sheet?
     var confirmingRestart = false
-    var announcement: Announcement?
     /// True once the player is signed in to Game Center.
     var gameCenterReady = false
     /// The tutorial is on screen.
@@ -231,20 +228,38 @@ final class GameCoordinator: GameSceneDelegate {
 
     func gameSceneDidStartRound(_ scene: GameScene) {
         backgroundShuffle += 1
+        dismissRoundSummary()
+        dismissGameOverSummary()
     }
 
-    func gameScene(_ scene: GameScene, didEndGameWithScore score: Int) {
+    func gameScene(_ scene: GameScene, didFinishRound summary: RoundSummary) {
+        withAnimation(.spring(duration: 0.5, bounce: 0.25)) { roundSummary = summary }
+    }
+
+    func dismissRoundSummary() {
+        guard roundSummary != nil else { return }
+        withAnimation(.easeIn(duration: 0.35)) { roundSummary = nil }
+    }
+
+    func gameScene(_ scene: GameScene, didEndGameWithScore score: Int, level: Int, abandoned: Bool) {
         GameCenter.shared.submit(score: score, difficulty: settings.difficulty)
-        guard scores.record(name: gameCenterAlias ?? settings.username, score: score,
-                            difficulty: settings.difficulty) else { return }
-        // Greets the player by their Game Center nickname when signed in.
-        let greeting = gameCenterAlias.map { "Well done \($0)!" } ?? "Well done!"
-        let announcement = Announcement(
-            title: "New Personal Best!",
-            message: "\(greeting)\n\nYour top \(settings.difficulty.name.lowercased()) score is now \(score).")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
-            SoundEngine.shared.play(.starBonus)
-            self?.announcement = announcement
+        let isPersonalBest = scores.record(name: gameCenterAlias ?? settings.username, score: score,
+                                           difficulty: settings.difficulty)
+        // A restart part-way through goes straight into a new game, so no summary.
+        guard !abandoned else { return }
+        let summary = GameOverSummary(difficulty: settings.difficulty, level: level, score: score,
+                                      isPersonalBest: isPersonalBest, playerName: gameCenterAlias)
+        // A short pause, so the failed path can start to fall away first. Skipped if a new
+        // game has started in the meantime.
+        let round = backgroundShuffle
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
+            guard let self = self, self.backgroundShuffle == round, !self.showingHome else { return }
+            withAnimation(.spring(duration: 0.5, bounce: 0.25)) { self.gameOverSummary = summary }
         }
+    }
+
+    func dismissGameOverSummary() {
+        guard gameOverSummary != nil else { return }
+        withAnimation(.easeIn(duration: 0.35)) { gameOverSummary = nil }
     }
 }

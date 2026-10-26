@@ -7,14 +7,45 @@ enum GameMood: Equatable {
     case playing, won, lost
 }
 
+/// A won round's score, line by line, for the summary card.
+struct RoundSummary: Identifiable, Equatable {
+    /// What the bonus star brought, if it was on the path.
+    enum Star: Equatable {
+        case powerup
+        case points(Int)
+    }
+
+    let id = UUID()
+    /// The level just won.
+    let level: Int
+    let pathCount: Int
+    let leftoverWhites: Int
+    let noWhitesBonus: Int
+    let lockedCount: Int
+    let star: Star?
+    /// One of each power-up, for a big round with no white squares left.
+    let powerupReward: Bool
+
+    var starPoints: Int {
+        if case .points(let points) = star { return points }
+        return 0
+    }
+
+    /// Everything the round added to the score, star points included.
+    var total: Int { pathCount + noWhitesBonus - leftoverWhites - lockedCount + starPoints }
+}
+
 protocol GameSceneDelegate: AnyObject {
     func gameSceneWantsSettings(_ scene: GameScene)
     func gameSceneWantsHighScores(_ scene: GameScene)
     func gameSceneWantsRestartConfirmation(_ scene: GameScene)
-    func gameScene(_ scene: GameScene, didEndGameWithScore score: Int)
+    /// A game ended: lost at `level`, or `abandoned` part-way through with a restart.
+    func gameScene(_ scene: GameScene, didEndGameWithScore score: Int, level: Int, abandoned: Bool)
     func gameScene(_ scene: GameScene, didChangeMood mood: GameMood)
     /// A new round has been dealt (the background shuffles its colours).
     func gameSceneDidStartRound(_ scene: GameScene)
+    /// A round was won: show its score breakdown.
+    func gameScene(_ scene: GameScene, didFinishRound summary: RoundSummary)
 }
 
 /// Drawing order. The scene ignores sibling order, so every node gets an explicit z.
@@ -192,7 +223,8 @@ final class GameScene: SKScene {
     private var gridDecor: [SKNode] = []
     private var crosses: [SKNode] = []
     private var starNode: SKSpriteNode?
-    private var scorePopup: SKNode?
+    /// What the star brought this round, once the wave has reached it.
+    private var collectedStar: RoundSummary.Star?
 
     private var titleLabel: SKLabelNode!
     private var ampersandLabel: SKLabelNode!
@@ -286,7 +318,7 @@ final class GameScene: SKScene {
         isHeld = false
         let finalScore = score
         if finalScore != 0 {
-            gameDelegate?.gameScene(self, didEndGameWithScore: finalScore)
+            gameDelegate?.gameScene(self, didEndGameWithScore: finalScore, level: level, abandoned: true)
         }
         startRound(afterWin: false)
     }
@@ -325,7 +357,6 @@ final class GameScene: SKScene {
         pressedCell = nil
         trackingGrid = false
         starNode = nil
-        scorePopup = nil
 
         // See-through: the SwiftUI mesh gradient behind the view is the background.
         backgroundColor = .clear
@@ -479,6 +510,7 @@ final class GameScene: SKScene {
         removeAction(forKey: "deal")
         removeAction(forKey: "resolve")
         removeAction(forKey: "star")
+        removeAction(forKey: "summary")
 
         if afterWin {
             level += 1
@@ -504,8 +536,7 @@ final class GameScene: SKScene {
         lastTick = nil
         message = isTutorial ? "Practice" : (punished ? Messages.pick(Messages.punishment) : levelText)
 
-        scorePopup?.removeFromParent()
-        scorePopup = nil
+        collectedStar = nil
         timerNode.reset()
 
         // The background goes back to all four colours, in a new arrangement.
@@ -1152,6 +1183,7 @@ final class GameScene: SKScene {
         let starColor = settings.starColor.uiColor
         let target: CGPoint
         if let kind = open.randomElement() {
+            collectedStar = .powerup
             SoundEngine.shared.play(.star)
             let powerup = powerupNodes[kind.rawValue]
             target = powerup.position
@@ -1164,6 +1196,7 @@ final class GameScene: SKScene {
                 powerup.run(self.bounceAction())
             }]))
         } else {
+            collectedStar = .points(level)
             SoundEngine.shared.play(.starBonus)
             target = scoreLabel.position
             score += level
@@ -1184,7 +1217,8 @@ final class GameScene: SKScene {
             }
         }
         sparkle(color: starColor, at: node.position, texture: Art.star, side: layout.s * 0.4, z: Z.flying)
-        node.zPosition = Z.flying
+        // Just below the controls: over the grid on the way, then under the power-up it lands on.
+        node.zPosition = Z.controls - 0.5
         if Motion.reduced {
             node.run(.sequence([.fadeOut(withDuration: 0.6), .removeFromParent()]))
         } else {
@@ -1207,8 +1241,7 @@ final class GameScene: SKScene {
         resultHaptic.notificationOccurred(.success)
         let total = result.total
         defer { onTutorialEvent?(.won(result)) }
-
-        showScorePopup(result)
+        var powerupReward = false
 
         if result.noWhites {
             if total < board.rows * board.cols {
@@ -1216,6 +1249,7 @@ final class GameScene: SKScene {
             } else {
                 // Big round with no whites left: one of each power-up.
                 let anyRoom = powerupCounts.contains { $0 < Board.maxPowerups }
+                powerupReward = anyRoom
                 message = Messages.pick(anyRoom ? Messages.reward : Messages.noWhite)
                 for powerup in powerupNodes where powerupCounts[powerup.kind.rawValue] < Board.maxPowerups {
                     powerupCounts[powerup.kind.rawValue] += 1
@@ -1251,6 +1285,24 @@ final class GameScene: SKScene {
         } else {
             SoundEngine.shared.play(.win)
         }
+
+        let summary = RoundSummary(
+            level: level, pathCount: result.pathCount, leftoverWhites: result.leftoverWhites,
+            noWhitesBonus: result.noWhitesBonus, lockedCount: result.lockedCount,
+            star: starOutcome(for: result), powerupReward: powerupReward)
+        // A short pause first, so the win itself (wave, confetti, star) plays before the card rises.
+        run(.sequence([.wait(forDuration: 0.9), .run { [weak self] in
+            guard let self = self else { return }
+            self.gameDelegate?.gameScene(self, didFinishRound: summary)
+        }]), withKey: "summary")
+    }
+
+    /// What the star brings this round. The wave may not have reached it yet; if not, this is
+    /// what it will bring when it does (power-up counts are final by now).
+    private func starOutcome(for result: RoundResult) -> RoundSummary.Star? {
+        if let collected = collectedStar { return collected }
+        guard let star = board.star, result.path.contains(star) else { return nil }
+        return powerupCounts.contains { $0 < Board.maxPowerups } ? .powerup : .points(level)
     }
 
     private func lose() {
@@ -1298,45 +1350,7 @@ final class GameScene: SKScene {
         refreshCounters()
         applyChromeForPhase()
         SoundEngine.shared.play(.fail)
-        gameDelegate?.gameScene(self, didEndGameWithScore: finalScore)
-    }
-
-    /// The black card that rises up showing path points, white squares and locked squares.
-    private func showScorePopup(_ result: RoundResult) {
-        let s = layout.s
-        let popup = SKNode()
-        popup.position = CGPoint(x: size.width / 2, y: layout.bottomY + s)
-        popup.zPosition = Z.popup
-        popup.alpha = 0
-
-        let back = SKShapeNode(rectOf: CGSize(width: 4 * s - 14, height: 4 * s - 14), cornerRadius: 6)
-        back.fillColor = .black
-        back.strokeColor = .clear
-        back.alpha = 0.75
-        popup.addChild(back)
-
-        let lines: [(String, UIColor)] = [
-            ("+\(result.pathCount)", pathColor),
-            (result.noWhites ? "+\(result.noWhitesBonus)" : "-\(result.leftoverWhites)", .white),
-            ("-\(result.lockedCount)", lockColor),
-        ]
-        for (i, line) in lines.enumerated() {
-            let label = makeLabel(line.0, font: "HelveticaNeue", size: 0.9 * s, color: line.1)
-            label.position = CGPoint(x: 0, y: 1.15 * s * CGFloat(1 - i))
-            label.zPosition = 0.1
-            popup.addChild(label)
-        }
-        addChild(popup)
-        scorePopup = popup
-
-        if Motion.reduced { popup.position.y = layout.gridCenter.y }
-        popup.run(.sequence([
-            .group([Motion.reduced ? SKAction.wait(forDuration: 0) : SKAction.moveTo(y: layout.gridCenter.y, duration: 1).timing(.easeOut),
-                    .fadeIn(withDuration: 0.7)]),
-            .wait(forDuration: 2),
-            .fadeOut(withDuration: 0.5),
-            .removeFromParent(),
-        ]))
+        gameDelegate?.gameScene(self, didEndGameWithScore: finalScore, level: level, abandoned: false)
     }
 
     /// The round's points float from the score towards the centre button while the score updates.

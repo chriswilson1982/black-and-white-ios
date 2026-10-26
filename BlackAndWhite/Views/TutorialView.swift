@@ -13,6 +13,7 @@ struct TutorialView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var tutorial = TutorialController()
 
     var body: some View {
@@ -26,6 +27,13 @@ struct TutorialView: View {
                     }
                 }
                 .ignoresSafeArea()
+
+                // The same round score card as the game.
+                if let summary = tutorial.roundSummary {
+                    RoundSummaryCard(summary: summary, settings: settings) { tutorial.dismissRoundSummary() }
+                        .id(summary.id)
+                        .transition(.roundSummary(reduceMotion: reduceMotion))
+                }
 
                 // The card stays inside the safe area, clear of the notch and home indicator.
                 VStack {
@@ -184,6 +192,8 @@ final class TutorialController: GameSceneDelegate {
     private(set) var scene: GameScene?
     private(set) var mood: GameMood = .playing
     private(set) var backgroundShuffle = 0
+    /// The practice round's score breakdown, while its card is showing.
+    private(set) var roundSummary: RoundSummary?
     private(set) var hint: String?
     private(set) var result: RoundResult?
 
@@ -252,11 +262,20 @@ final class TutorialController: GameSceneDelegate {
 
     func gameSceneDidStartRound(_ scene: GameScene) {
         backgroundShuffle += 1
+        roundSummary = nil
+    }
+
+    func gameScene(_ scene: GameScene, didFinishRound summary: RoundSummary) {
+        withAnimation(.spring(duration: 0.5, bounce: 0.25)) { roundSummary = summary }
+    }
+
+    func dismissRoundSummary() {
+        withAnimation(.easeIn(duration: 0.35)) { roundSummary = nil }
     }
 
     // The tutorial has no settings, high scores or restarts, and never records a score.
     func gameSceneWantsSettings(_ scene: GameScene) {}
     func gameSceneWantsHighScores(_ scene: GameScene) {}
     func gameSceneWantsRestartConfirmation(_ scene: GameScene) {}
-    func gameScene(_ scene: GameScene, didEndGameWithScore score: Int) {}
+    func gameScene(_ scene: GameScene, didEndGameWithScore score: Int, level: Int, abandoned: Bool) {}
 }
