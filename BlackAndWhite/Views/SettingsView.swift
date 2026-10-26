@@ -5,10 +5,14 @@ struct SettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var draft: GameSettings
     private let onSave: (GameSettings) -> Void
+    /// Leaves the game for the title screen. Nil when Settings was opened from the title screen.
+    private let onReturnToTitle: (() -> Void)?
 
-    init(settings: GameSettings, onSave: @escaping (GameSettings) -> Void) {
+    init(settings: GameSettings, onSave: @escaping (GameSettings) -> Void,
+         onReturnToTitle: (() -> Void)? = nil) {
         _draft = State(initialValue: settings)
         self.onSave = onSave
+        self.onReturnToTitle = onReturnToTitle
     }
 
     var body: some View {
@@ -62,6 +66,20 @@ struct SettingsView: View {
                 Section {
                     NavigationLink("Tutorial") { TutorialView(settings: resolvedDraft) }
                     NavigationLink("How to play") { HelpView() }
+                }
+
+                if let onReturnToTitle = onReturnToTitle {
+                    Section {
+                        Button {
+                            onSave(draft)
+                            onReturnToTitle()
+                            dismiss()
+                        } label: {
+                            Label("Return to Title Screen", systemImage: "house.fill")
+                        }
+                    } footer: {
+                        Text("Saves your settings and leaves this game.")
+                    }
                 }
             }
             .navigationTitle("Settings")

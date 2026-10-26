@@ -49,6 +49,8 @@ final class GameCoordinator: GameSceneDelegate {
     /// it just returns there.
     @ObservationIgnored private var tutorialStartsGame = false
     @ObservationIgnored private var started = false
+    /// Settings asked to return to the title screen when it closes.
+    @ObservationIgnored private var returnToTitleAfterSettings = false
 
     init() {
         settings = GameSettings.load()
@@ -180,6 +182,19 @@ final class GameCoordinator: GameSceneDelegate {
         presentedSheet = nil
         switch sheet {
         case .settings:
+            if returnToTitleAfterSettings {
+                // Keep any changes, but leave the game for the title screen rather than restarting.
+                returnToTitleAfterSettings = false
+                if let newSettings = pendingSettings {
+                    pendingSettings = nil
+                    settings = newSettings
+                    settings.save()
+                    SoundEngine.shared.enabled = newSettings.soundEnabled
+                    scene?.updateTheme(effectiveSettings)
+                }
+                returnToTitle()
+                return
+            }
             // As in the original, leaving settings always starts a fresh game.
             if let newSettings = pendingSettings {
                 pendingSettings = nil
@@ -194,6 +209,20 @@ final class GameCoordinator: GameSceneDelegate {
             break
         }
         scene?.setHeld(false)
+    }
+
+    /// Asked for from Settings: go back to the title screen once the sheet has closed.
+    func requestReturnToTitle() {
+        returnToTitleAfterSettings = true
+    }
+
+    /// Leaves the game for the title screen. The game waits, paused; Play starts a fresh one.
+    private func returnToTitle() {
+        scene?.setHeld(true)
+        roundSummary = nil
+        gameOverSummary = nil
+        mood = .playing
+        withAnimation(.easeInOut(duration: 0.3)) { showingHome = true }
     }
 
     func restartConfirmed() {
@@ -248,7 +277,9 @@ final class GameCoordinator: GameSceneDelegate {
         // A restart part-way through goes straight into a new game, so no summary.
         guard !abandoned else { return }
         let summary = GameOverSummary(difficulty: settings.difficulty, level: level, score: score,
-                                      isPersonalBest: isPersonalBest, playerName: gameCenterAlias)
+                                      isPersonalBest: isPersonalBest,
+                                      personalBest: scores.syncedBest[settings.difficulty]?.score,
+                                      playerName: gameCenterAlias)
         // A short pause, so the failed path can start to fall away first. Skipped if a new
         // game has started in the meantime.
         let round = backgroundShuffle

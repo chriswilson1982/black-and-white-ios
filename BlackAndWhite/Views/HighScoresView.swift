@@ -8,6 +8,7 @@ struct HighScoresView: View {
     @Environment(\.dismiss) private var dismiss
     private let gameCenterAvailable: Bool
     private let onShowGameCenter: (Difficulty) -> Void
+    private let onShowAchievements: () -> Void
 
     private enum StandingState {
         case loading
@@ -19,11 +20,13 @@ struct HighScoresView: View {
 
     /// - Parameter difficulty: shown first; normally the difficulty chosen in Settings.
     init(store: HighScoreStore, difficulty: Difficulty, gameCenterAvailable: Bool = false,
-         onShowGameCenter: @escaping (Difficulty) -> Void = { _ in }) {
+         onShowGameCenter: @escaping (Difficulty) -> Void = { _ in },
+         onShowAchievements: @escaping () -> Void = {}) {
         self.store = store
         _difficulty = State(initialValue: difficulty)
         self.gameCenterAvailable = gameCenterAvailable
         self.onShowGameCenter = onShowGameCenter
+        self.onShowAchievements = onShowAchievements
     }
 
     var body: some View {
@@ -43,6 +46,17 @@ struct HighScoresView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+
+                        Button(action: onShowAchievements) {
+                            Label("Achievements", systemImage: "rosette")
+                                .labelStyle(.titleAndIcon)
+                                .imageScale(.large)
+                                .font(.headline)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.bordered)
+                        .listRowInsets(EdgeInsets(top: 10, leading: 0, bottom: 0, trailing: 0))
                         .listRowBackground(Color.clear)
                     }
                 }

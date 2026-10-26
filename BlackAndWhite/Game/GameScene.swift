@@ -25,6 +25,8 @@ struct RoundSummary: Identifiable, Equatable {
     let star: Star?
     /// One of each power-up, for a big round with no white squares left.
     let powerupReward: Bool
+    /// The number of squares in the grid (the score a power-up reward needs).
+    let gridSize: Int
 
     var starPoints: Int {
         if case .points(let points) = star { return points }
@@ -226,6 +228,15 @@ final class GameScene: SKScene {
     /// What the star brought this round, once the wave has reached it.
     private var collectedStar: RoundSummary.Star?
 
+    // For achievements.
+    private var squareTapsThisRound = 0
+    private var usedPowerupsThisRound = false
+    private var usedPowerupsThisGame = false
+    private var isTrickyGrid = false
+    private var timeLeftAtCommit: TimeInterval = 0
+    /// Achievements only count in real games, not the tutorial.
+    private var achievements: AchievementTracker? { isTutorial ? nil : .shared }
+
     private var titleLabel: SKLabelNode!
     private var ampersandLabel: SKLabelNode!
     private var settingsButton: SKSpriteNode!
@@ -365,10 +376,10 @@ final class GameScene: SKScene {
         let w = size.width
 
         // Title: "black & white" with a bold ampersand.
-        titleLabel = makeLabel("black  white", font: "HelveticaNeue-Light", size: s, color: textColor)
+        titleLabel = makeLabel("black  white", weight: .light, size: s, color: textColor)
         titleLabel.position = CGPoint(x: w / 2, y: layout.titleY)
         addChild(titleLabel)
-        ampersandLabel = makeLabel("&", font: "HelveticaNeue-Bold", size: s, color: textColor)
+        ampersandLabel = makeLabel("&", weight: .bold, size: s, color: textColor)
         ampersandLabel.position = titleLabel.position
         addChild(ampersandLabel)
 
@@ -390,13 +401,13 @@ final class GameScene: SKScene {
         }
 
         // Message, straight on the background.
-        messageLabel = makeLabel(message, font: "HelveticaNeue-Bold", size: 0.45 * s, color: textColor)
+        messageLabel = makeLabel(message, weight: .bold, size: 0.45 * s, color: textColor)
         messageLabel.position = CGPoint(x: w / 2, y: layout.messageY)
         messageLabel.zPosition = Z.message
         addChild(messageLabel)
 
         // Score (bottom left).
-        scoreLabel = makeLabel("\(score)", font: "HelveticaNeue-Bold", size: 0.85 * s, color: textColor)
+        scoreLabel = makeLabel("\(score)", weight: .bold, size: 0.85 * s, color: textColor)
         scoreLabel.position = CGPoint(x: w / 2 - 2.5 * s, y: layout.bottomY)
         addChild(scoreLabel)
 
@@ -430,10 +441,10 @@ final class GameScene: SKScene {
         addChild(timerNode)
 
         // Black and white square counters, shown on top of a square of the matching colour.
-        blackCounter = makeLabel("0", font: "HelveticaNeue", size: 0.65 * s, color: .white)
+        blackCounter = makeLabel("0", weight: .regular, size: 0.65 * s, color: .white)
         blackCounter.zPosition = Z.counter
         addChild(blackCounter)
-        whiteCounter = makeLabel("0", font: "HelveticaNeue", size: 0.65 * s, color: .black)
+        whiteCounter = makeLabel("0", weight: .regular, size: 0.65 * s, color: .black)
         whiteCounter.zPosition = Z.counter
         addChild(whiteCounter)
 
@@ -514,14 +525,19 @@ final class GameScene: SKScene {
 
         if afterWin {
             level += 1
+            achievements?.levelReached(level, usedPowerupsThisGame: usedPowerupsThisGame)
         } else {
             level = 1
             score = 0
             powerupCounts = Array(repeating: settings.difficulty.startingPowerups, count: 3)
             punishNext = false
+            usedPowerupsThisGame = false
         }
         let punished = punishNext
         punishNext = false
+        squareTapsThisRound = 0
+        usedPowerupsThisRound = false
+        isTrickyGrid = punished
 
         board = tutorialBoard ?? Board.randomSolvable(punishment: punished)
         phase = .dealing
@@ -905,6 +921,8 @@ final class GameScene: SKScene {
         case .unlock:
             if board.isLocked(p) {
                 board.unlock(p)
+                usedPowerupsThisRound = true
+                usedPowerupsThisGame = true
                 powerupCounts[PowerupNode.Kind.unlock.rawValue] -= 1
                 SoundEngine.shared.play(.unlock)
                 flipSquare(p)
@@ -925,6 +943,8 @@ final class GameScene: SKScene {
                 return
             }
             board.toggle(p)
+            usedPowerupsThisRound = true
+            usedPowerupsThisGame = true
             powerupCounts[PowerupNode.Kind.flipOne.rawValue] -= 1
             setMode(.normal)
             SoundEngine.shared.play(.unlock)
@@ -947,6 +967,7 @@ final class GameScene: SKScene {
         }
         let hadStar = board.star == p
         let flipped = board.lock(p)
+        squareTapsThisRound += 1
         tapHaptic.impactOccurred()
 
         if let node = squares[p] {
@@ -959,6 +980,7 @@ final class GameScene: SKScene {
             star.run(.sequence([Motion.reduced ? SKAction.fadeOut(withDuration: 0.4) : SKAction.scale(to: 0, duration: 0.5),
                                 .removeFromParent()]))
             SoundEngine.shared.play(.starAway)
+            achievements?.starDestroyed()
             message = "Goodbye star!"
         } else {
             SoundEngine.shared.play(.tap)
@@ -986,6 +1008,8 @@ final class GameScene: SKScene {
             node.run(pressAction(0.9))
             // A wave sweeping across from the left.
             let flippedAll = board.flipAll()
+            usedPowerupsThisRound = true
+            usedPowerupsThisGame = true
             for p in flippedAll {
                 flipSquare(p, delay: Double(p.col) * 0.04 + Double(p.row) * 0.015)
             }
@@ -1113,6 +1137,8 @@ final class GameScene: SKScene {
             styleSquare(p)
         }
 
+        // For Photo Finish: how much time was left when the path was tested.
+        timeLeftAtCommit = settings.difficulty.timeAllowed(level: level) - elapsed
         let result = board.evaluate()
         resultPath = result.path
         resultWon = result.won
@@ -1188,6 +1214,8 @@ final class GameScene: SKScene {
             let powerup = powerupNodes[kind.rawValue]
             target = powerup.position
             powerupCounts[kind.rawValue] = min(powerupCounts[kind.rawValue] + 1, Board.maxPowerups)
+            achievements?.starCollected(forPoints: false)
+            achievements?.powerupsChanged(powerupCounts)
             // The count goes up as the star lands.
             run(.sequence([.wait(forDuration: hop + flight), .run { [weak self] in
                 guard let self = self else { return }
@@ -1200,8 +1228,10 @@ final class GameScene: SKScene {
             SoundEngine.shared.play(.starBonus)
             target = scoreLabel.position
             score += level
+            achievements?.starCollected(forPoints: true)
+            achievements?.scoreChanged(to: score, difficulty: settings.difficulty)
             // The same size as the round's score change by the score.
-            let bonus = makeLabel("+\(level)", font: "HelveticaNeue-Bold", size: 0.85 * layout.s, color: textColor)
+            let bonus = makeLabel("+\(level)", weight: .bold, size: 0.85 * layout.s, color: textColor)
             bonus.position = CGPoint(x: node.position.x, y: node.position.y + 0.7 * layout.s)
             bonus.zPosition = Z.flying
             addChild(bonus)
@@ -1267,6 +1297,11 @@ final class GameScene: SKScene {
         }
 
         score += total
+        achievements?.roundWon(noWhitesLeft: result.noWhites, powerupReward: powerupReward,
+                               squareTaps: squareTapsThisRound, usedPowerups: usedPowerupsThisRound,
+                               wasTrickyGrid: isTrickyGrid, timeLeft: timeLeftAtCommit)
+        achievements?.scoreChanged(to: score, difficulty: settings.difficulty)
+        if powerupReward { achievements?.powerupsChanged(powerupCounts) }
         animateScoreChange(total)
         if total > 0 {
             // Bigger rounds get more confetti; a reward round gets the lot.
@@ -1289,7 +1324,7 @@ final class GameScene: SKScene {
         let summary = RoundSummary(
             level: level, pathCount: result.pathCount, leftoverWhites: result.leftoverWhites,
             noWhitesBonus: result.noWhitesBonus, lockedCount: result.lockedCount,
-            star: starOutcome(for: result), powerupReward: powerupReward)
+            star: starOutcome(for: result), powerupReward: powerupReward, gridSize: board.rows * board.cols)
         // A short pause first, so the win itself (wave, confetti, star) plays before the card rises.
         run(.sequence([.wait(forDuration: 0.9), .run { [weak self] in
             guard let self = self else { return }
@@ -1356,7 +1391,7 @@ final class GameScene: SKScene {
     /// The round's points float from the score towards the centre button while the score updates.
     private func animateScoreChange(_ delta: Int, isLoss: Bool = false) {
         let text = delta < 0 ? "\(delta)" : "+\(delta)"
-        let label = makeLabel(text, font: "HelveticaNeue-Bold", size: 0.85 * layout.s,
+        let label = makeLabel(text, weight: .bold, size: 0.85 * layout.s,
                               color: delta < 0 || isLoss ? lockColor : textColor)
         label.position = scoreLabel.position
         // Just below the controls, so it slides under the centre button rather than over it.
@@ -1812,12 +1847,12 @@ final class GameScene: SKScene {
         back.strokeColor = .clear
         back.alpha = 0.9
         card.addChild(back)
-        let title = makeLabel(levelText, font: "HelveticaNeue-Bold", size: 0.8 * s, color: backdropColor)
+        let title = makeLabel(levelText, weight: .bold, size: 0.8 * s, color: backdropColor)
         title.position = CGPoint(x: 0, y: subtitle == nil ? 0 : 0.25 * s)
         title.zPosition = 0.1
         card.addChild(title)
         if let subtitle = subtitle {
-            let sub = makeLabel(subtitle, font: "HelveticaNeue", size: 0.4 * s, color: backdropColor)
+            let sub = makeLabel(subtitle, weight: .regular, size: 0.4 * s, color: backdropColor)
             sub.position = CGPoint(x: 0, y: -0.5 * s)
             sub.zPosition = 0.1
             card.addChild(sub)
@@ -1841,8 +1876,10 @@ final class GameScene: SKScene {
         }
     }
 
-    private func makeLabel(_ text: String, font: String, size: CGFloat, color: UIColor) -> SKLabelNode {
-        let label = SKLabelNode(fontNamed: font)
+    /// A label in the rounded system font, centred on its position.
+    private func makeLabel(_ text: String, weight: UIFont.Weight, size: CGFloat, color: UIColor) -> SKLabelNode {
+        let label = RoundedLabelNode()
+        label.weight = weight
         label.text = text
         label.fontSize = size
         label.fontColor = color

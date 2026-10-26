@@ -1,6 +1,47 @@
 import SpriteKit
 import UIKit
 
+/// A label in the system font's rounded design, to match the SwiftUI screens. SpriteKit labels
+/// pick fonts by name and the rounded design has no public name, so this draws its text as
+/// attributed text instead. `text`, `fontSize` and `fontColor` work as usual.
+final class RoundedLabelNode: SKLabelNode {
+    var weight: UIFont.Weight = .regular {
+        didSet { refresh() }
+    }
+
+    private var refreshing = false
+
+    override var text: String? {
+        didSet { refresh() }
+    }
+
+    override var fontSize: CGFloat {
+        didSet { refresh() }
+    }
+
+    override var fontColor: UIColor? {
+        didSet { refresh() }
+    }
+
+    /// Rebuilds the attributed text from the current text, size, weight and colour.
+    private func refresh() {
+        // Setting the attributed text can touch `text` too; don't come back round.
+        guard !refreshing else { return }
+        refreshing = true
+        defer { refreshing = false }
+        guard let text = text else {
+            attributedText = nil
+            return
+        }
+        let system = UIFont.systemFont(ofSize: fontSize, weight: weight)
+        let font = system.fontDescriptor.withDesign(.rounded).map { UIFont(descriptor: $0, size: fontSize) } ?? system
+        attributedText = NSAttributedString(string: text, attributes: [
+            .font: font,
+            .foregroundColor: fontColor ?? .white,
+        ])
+    }
+}
+
 /// The colour a square is showing (or is about to show, mid-animation).
 struct SquareLook: Equatable {
     var color: UIColor
@@ -285,7 +326,7 @@ final class PowerupNode: SKNode {
     private let body: SKShapeNode
     private let maxRing: SKShapeNode
     private let icon = SKSpriteNode()
-    private let label = SKLabelNode(fontNamed: "HelveticaNeue")
+    private let label = RoundedLabelNode()
     private var lastCount: Int?
 
     init(kind: Kind, size: CGSize, maxColor: UIColor) {

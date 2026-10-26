@@ -24,6 +24,8 @@ struct RoundSummaryCard: View {
         let swatch: Swatch
         let label: String
         let value: String
+        /// A small line under the label explaining it, if needed.
+        let detail: String?
     }
 
     private var textColor: Color { Color(uiColor: settings.textColor) }
@@ -32,8 +34,8 @@ struct RoundSummaryCard: View {
 
     private var rows: [Row] {
         var rows: [Row] = []
-        func add(_ swatch: Swatch, _ label: String, _ value: String) {
-            rows.append(Row(id: rows.count, swatch: swatch, label: label, value: value))
+        func add(_ swatch: Swatch, _ label: String, _ value: String, detail: String? = nil) {
+            rows.append(Row(id: rows.count, swatch: swatch, label: label, value: value, detail: detail))
         }
         add(.color(pathColor), "Path squares", "+\(summary.pathCount)")
         if summary.noWhitesBonus > 0 {
@@ -50,7 +52,8 @@ struct RoundSummaryCard: View {
         case nil: break
         }
         if summary.powerupReward {
-            add(.symbol("plus.square.fill"), "Power-up reward", "+1 of each")
+            add(.symbol("plus.square.fill"), "Power-up reward", "+1 each",
+                detail: "Score ≥ grid size (\(summary.gridSize))")
         }
         return rows
     }
@@ -66,10 +69,25 @@ struct RoundSummaryCard: View {
                     let shown = row.id < shownRows
                     HStack(spacing: 12) {
                         swatch(row.swatch)
-                        Text(row.label)
-                        Spacer(minLength: 12)
+                        VStack(alignment: .leading, spacing: 1) {
+                            // One line each: shrinks a little rather than wrapping.
+                            Text(row.label)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                            if let detail = row.detail {
+                                Text(detail)
+                                    .font(.caption)
+                                    .opacity(0.6)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                            }
+                        }
+                        Spacer(minLength: 8)
                         Text(row.value)
                             .font(.body.bold().monospacedDigit())
+                            .lineLimit(1)
+                            // The value keeps its full width; the label gives way first.
+                            .layoutPriority(1)
                     }
                     .opacity(shown ? 1 : 0)
                     .offset(y: shown ? 0 : 8)
@@ -81,7 +99,7 @@ struct RoundSummaryCard: View {
                     Text("Total")
                         .font(.title3.bold())
                     Spacer()
-                    SummaryCardScore(value: shownTotal, signed: true, textColor: textColor,
+                    SummaryCardScore(value: shownTotal, signed: true,
                                      color: summary.total > 0 ? pathColor : lockColor)
                 }
 
@@ -135,7 +153,9 @@ struct RoundSummaryCard: View {
     }
 
     private func accessibilityText(_ rows: [Row]) -> String {
-        let lines = rows.map { "\($0.label), \($0.value)" }
+        let lines = rows.map { row in
+            "\(row.label), \(row.value)" + (row.detail.map { ", \($0)" } ?? "")
+        }
         return (["Level \(summary.level)"] + lines + ["Total, \(summary.total)"]).joined(separator: ". ")
     }
 }
@@ -151,6 +171,8 @@ struct GameOverSummary: Identifiable, Equatable {
     let score: Int
     /// The score beats the player's best at this difficulty on any of their devices.
     let isPersonalBest: Bool
+    /// The player's best ever at this difficulty, on any of their devices (this game included).
+    let personalBest: Int?
     /// The player's Game Center nickname, when signed in, to greet them by.
     let playerName: String?
 
@@ -180,6 +202,9 @@ struct GameOverCard: View {
 
                 row("Difficulty", summary.difficulty.name)
                 row("Level reached", "\(summary.level)")
+                if let best = summary.personalBest {
+                    row("Personal best", "\(best)")
+                }
 
                 SummaryCardDivider(color: textColor)
 
@@ -187,7 +212,7 @@ struct GameOverCard: View {
                     Text("Final score")
                         .font(.title3.bold())
                     Spacer()
-                    SummaryCardScore(value: shownScore, signed: false, textColor: textColor,
+                    SummaryCardScore(value: shownScore, signed: false,
                                      color: summary.score > 0 ? settings.pathColor.color : settings.lockColor.color)
                 }
 
@@ -215,6 +240,7 @@ struct GameOverCard: View {
 
     private var accessibilityText: String {
         "Game over. Difficulty, \(summary.difficulty.name). Level reached, \(summary.level). "
+            + (summary.personalBest.map { "Personal best, \($0). " } ?? "")
             + "Final score, \(summary.score)" + (summary.isPersonalBest ? ". \(summary.personalBestText)" : "")
     }
 
@@ -302,44 +328,18 @@ private struct SummaryCardFooter: View {
     }
 }
 
-/// The big score that counts up, with a fine edge in the text colour so a light colour still reads.
+/// The big score that counts up.
 private struct SummaryCardScore: View {
     let value: Int
     /// Shows a + on positive values.
     let signed: Bool
-    let textColor: Color
     let color: Color
 
     var body: some View {
         Text(signed && value > 0 ? "+\(value)" : "\(value)")
             .font(.system(size: 40, weight: .bold).monospacedDigit())
             .contentTransition(.numericText(value: Double(value)))
-            // Before the colour, so the outline copies keep the text colour.
-            .fineOutline(textColor, width: 0.8)
             .foregroundStyle(color)
-    }
-}
-
-extension View {
-    /// A fine outline around text (SwiftUI has no text stroke): eight copies in `color`, each
-    /// offset a hairline in a different direction, side by side behind it. (Chained shadows
-    /// would copy each other and build up into a thick blur.)
-    ///
-    /// Apply it before the text's own `foregroundStyle`, so the copies keep `color`.
-    func fineOutline(_ color: Color, width: CGFloat) -> some View {
-        let d = width * 0.7071 // Diagonal offsets, so every direction is the same distance out.
-        let offsets = [CGSize(width: width, height: 0), CGSize(width: -width, height: 0),
-                       CGSize(width: 0, height: width), CGSize(width: 0, height: -width),
-                       CGSize(width: d, height: d), CGSize(width: -d, height: d),
-                       CGSize(width: d, height: -d), CGSize(width: -d, height: -d)]
-        return background {
-            ZStack {
-                ForEach(offsets.indices, id: \.self) { i in
-                    self.foregroundStyle(color).offset(offsets[i])
-                }
-            }
-            .accessibilityHidden(true)
-        }
     }
 }
 

@@ -88,21 +88,28 @@ struct ContentView: View {
         .preferredColorScheme(forcedScheme)
         .statusBarHidden()
         .sheet(item: $coordinator.activeSheet, onDismiss: { coordinator.sheetDismissed() }) { sheet in
-            switch sheet {
-            case .settings:
-                SettingsView(settings: coordinator.settings) { coordinator.pendingSettings = $0 }
-            case .highScores:
-                HighScoresView(store: coordinator.scores, difficulty: coordinator.settings.difficulty,
-                               gameCenterAvailable: coordinator.gameCenterReady) { difficulty in
-                    coordinator.showGameCenterLeaderboard(for: difficulty)
+            Group {
+                switch sheet {
+                case .settings:
+                    SettingsView(settings: coordinator.settings,
+                                 onSave: { coordinator.pendingSettings = $0 },
+                                 // Only offered from a game; on the title screen there's nowhere to return to.
+                                 onReturnToTitle: coordinator.showingHome ? nil : { coordinator.requestReturnToTitle() })
+                case .highScores:
+                    HighScoresView(store: coordinator.scores, difficulty: coordinator.settings.difficulty,
+                                   gameCenterAvailable: coordinator.gameCenterReady,
+                                   onShowGameCenter: { coordinator.showGameCenterLeaderboard(for: $0) },
+                                   onShowAchievements: { GameCenter.shared.showAchievements() })
+                case .help:
+                    HelpSheet()
                 }
-            case .help:
-                HelpSheet()
             }
+            .fontDesign(.rounded)
         }
         .fullScreenCover(isPresented: $coordinator.showingTutorial,
                          onDismiss: { coordinator.tutorialDismissed() }) {
             TutorialView(settings: coordinator.effectiveSettings) { coordinator.finishTutorial() }
+                .fontDesign(.rounded)
         }
     }
 }

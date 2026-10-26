@@ -36,6 +36,10 @@ final class GameCenter: NSObject, GKGameCenterControllerDelegate {
             }
             let player = GKLocalPlayer.local
             self.isAuthenticated = player.isAuthenticated
+            if player.isAuthenticated {
+                // Anything earned while signed out goes now.
+                AchievementTracker.shared.reportPending()
+            }
             self.onAuthenticationFinished?(player.isAuthenticated,
                                            player.isAuthenticated ? player.alias : nil)
         }
@@ -80,6 +84,13 @@ final class GameCenter: NSObject, GKGameCenterControllerDelegate {
         guard isAuthenticated else { return }
         let viewController = GKGameCenterViewController(leaderboardID: Self.leaderboardID(for: difficulty),
                                                         playerScope: .global, timeScope: .allTime)
+        viewController.gameCenterDelegate = self
+        Self.topViewController()?.present(viewController, animated: true)
+    }
+
+    func showAchievements() {
+        guard isAuthenticated else { return }
+        let viewController = GKGameCenterViewController(state: .achievements)
         viewController.gameCenterDelegate = self
         Self.topViewController()?.present(viewController, animated: true)
     }
