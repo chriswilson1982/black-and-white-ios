@@ -34,30 +34,16 @@ struct HighScoresView: View {
             List {
                 if gameCenterAvailable {
                     Section {
-                        Button {
-                            onShowGameCenter(difficulty)
-                        } label: {
-                            Label("Game Center Leaderboard", systemImage: "gamecontroller.fill")
-                                // In a list row the system may otherwise show the title alone.
-                                .labelStyle(.titleAndIcon)
-                                .imageScale(.large)
-                                .font(.headline)
-                                .frame(maxWidth: .infinity, minHeight: 44)
+                        HStack(spacing: 12) {
+                            gameCenterButton("Leaderboard", image: "leaderboards") {
+                                onShowGameCenter(difficulty)
+                            }
+                            gameCenterButton("Achievements", image: "achievements", action: onShowAchievements)
                         }
-                        .buttonStyle(.borderedProminent)
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
-
-                        Button(action: onShowAchievements) {
-                            Label("Achievements", systemImage: "rosette")
-                                .labelStyle(.titleAndIcon)
-                                .imageScale(.large)
-                                .font(.headline)
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                        }
-                        .buttonStyle(.bordered)
-                        .listRowInsets(EdgeInsets(top: 10, leading: 0, bottom: 0, trailing: 0))
-                        .listRowBackground(Color.clear)
+                    } header: {
+                        GameCenterHeader()
                     }
                 }
 
@@ -72,22 +58,7 @@ struct HighScoresView: View {
                     .listRowInsets(EdgeInsets())
                 }
 
-                if let best = store.syncedBest[difficulty] {
-                    Section {
-                        LabeledContent("Best score") {
-                            Text("\(best.score)").monospacedDigit().bold()
-                        }
-                        LabeledContent("Set on") {
-                            Text(best.date, format: .dateTime.day().month().year())
-                        }
-                    } header: {
-                        Text("Personal best")
-                    } footer: {
-                        Text("Your best on any of your devices, synced with iCloud.")
-                    }
-                }
-
-                worldwideSection
+                personalBestSection
 
                 let best = store.bestGames(for: difficulty)
                 if best.isEmpty {
@@ -124,41 +95,93 @@ struct HighScoresView: View {
 
     // MARK: Game Center
 
+    /// The player's Game Center entry, once loaded.
+    private var gameCenterStanding: GameCenter.Standing? {
+        if case .loaded(let mine?) = standing { return mine }
+        return nil
+    }
+
+    /// Game Center is still being asked for the player's entry.
+    private var isLoading: Bool {
+        guard gameCenterAvailable, case .loading = standing else { return false }
+        return true
+    }
+
+    /// The best score and when it was set: the higher of the iCloud and Game Center bests.
+    /// They normally match, but either can be missing (signed out, offline or not yet posted).
+    private var personalBest: (score: Int, date: Date)? {
+        let synced = store.syncedBest[difficulty].map { (score: $0.score, date: $0.date) }
+        let online = gameCenterStanding.map { (score: $0.bestScore, date: $0.date) }
+        switch (synced, online) {
+        case let (synced?, online?): return online.score >= synced.score ? online : synced
+        case let (synced?, nil): return synced
+        case let (nil, online?): return online
+        case (nil, nil): return nil
+        }
+    }
+
+    /// One section for the personal best, with the worldwide rank from Game Center when there is one.
     @ViewBuilder
-    private var worldwideSection: some View {
-        Section {
-            if !gameCenterAvailable {
-                Text("Sign in to Game Center in the Settings app to see your worldwide ranking.")
-                    .foregroundStyle(.secondary)
-            } else {
-                switch standing {
-                case .loading:
-                    HStack {
-                        Text("Loading…").foregroundStyle(.secondary)
-                        Spacer()
-                        ProgressView()
-                    }
-                case .failed:
-                    Text("Couldn't reach Game Center. Try again later.")
-                        .foregroundStyle(.secondary)
-                case .loaded(nil):
-                    Text("No \(difficulty.name.lowercased()) score on Game Center yet. Finish a game to post one.")
-                        .foregroundStyle(.secondary)
-                case .loaded(let mine?):
+    private var personalBestSection: some View {
+        if personalBest != nil || isLoading {
+            Section {
+                if let best = personalBest {
                     LabeledContent("Best score") {
-                        Text("\(mine.bestScore)").monospacedDigit().bold()
+                        Text("\(best.score)").monospacedDigit().bold()
                     }
+                }
+                if isLoading {
+                    LabeledContent("Worldwide rank") { ProgressView() }
+                } else if let mine = gameCenterStanding {
                     LabeledContent("Worldwide rank") {
                         Text("#\(mine.rank.formatted()) of \(mine.totalPlayers.formatted())").monospacedDigit()
                     }
+                }
+                if let best = personalBest {
                     LabeledContent("Set on") {
-                        Text(mine.date, format: .dateTime.day().month().year())
+                        Text(best.date, format: .dateTime.day().month().year())
                     }
                 }
+            } header: {
+                Text("Personal best")
+            } footer: {
+                Text(personalBestFooter)
             }
-        } header: {
-            Text("Worldwide")
         }
+    }
+
+    private var personalBestFooter: String {
+        guard gameCenterAvailable else {
+            return "Your best on any of your devices. Sign in to Game Center in the Settings app "
+                + "to see your worldwide rank."
+        }
+        if case .failed = standing {
+            return "Your best on any of your devices. Couldn't reach Game Center for your worldwide rank; "
+                + "try again later."
+        }
+        return "Your best on any of your devices."
+    }
+
+    /// A tile with one of Game Center's own symbols (tinted) above its title.
+    private func gameCenterButton(_ title: String, image: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 0) {
+                // Apple's artwork has generous space around the glyph, so the frame is larger
+                // than the symbol looks.
+                Image(image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 56, height: 56)
+                    .padding(.vertical, -6)
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(.headline)
+            }
+            .frame(maxWidth: .infinity, minHeight: 80)
+        }
+        .buttonStyle(.bordered)
+        // Each tile is its own button, not the whole row.
+        .buttonBorderShape(.roundedRectangle(radius: 14))
     }
 
     private func loadStanding() async {
@@ -197,5 +220,24 @@ struct HighScoresView: View {
                 .bold()
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// A section header with Game Center's colour icon, for the Game Center buttons.
+struct GameCenterHeader: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Image("gameCenter")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 24, height: 24)
+                .accessibilityHidden(true)
+            Text("Game Center")
+                .font(.headline)
+                .foregroundStyle(.primary)
+        }
+        // Section headers are otherwise upper case.
+        .textCase(nil)
+        .accessibilityAddTraits(.isHeader)
     }
 }

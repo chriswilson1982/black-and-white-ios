@@ -253,6 +253,84 @@ struct GameOverCard: View {
     }
 }
 
+// MARK: - Start
+
+/// What the start card shows before a new game.
+struct StartPrompt: Identifiable, Equatable {
+    let id = UUID()
+    let difficulty: Difficulty
+    /// The player's best at this difficulty, if they have one.
+    let personalBest: Int?
+}
+
+/// Shown before each new game, so the clock doesn't start until the player is ready.
+/// The grid is dealt when they tap Start (or anywhere).
+struct StartCard: View {
+    let prompt: StartPrompt
+    /// Resolved settings, for the theme's colours.
+    let settings: GameSettings
+    let onStart: () -> Void
+
+    private var textColor: Color { Color(uiColor: settings.textColor) }
+    private var seconds: Int { Int(prompt.difficulty.timeAllowed(level: 1)) }
+
+    var body: some View {
+        SummaryCardContainer(settings: settings, accessibilityText: accessibilityText,
+                             accessibilityHint: "Starts the game", onDismiss: onStart) {
+            VStack(alignment: .leading, spacing: 14) {
+                SummaryCardTitle("New game")
+
+                row("Difficulty", prompt.difficulty.name)
+                row("Clock", "\(seconds) seconds", detail: "Gets quicker every level")
+                if let best = prompt.personalBest {
+                    row("Personal best", "\(best)")
+                }
+
+                // Styled like the game's centre button and the title screen's Play.
+                Button(action: onStart) {
+                    ZStack {
+                        Capsule().fill(.black)
+                        Capsule()
+                            .fill(settings.pathColor.color)
+                            .overlay(Capsule().stroke(.white, lineWidth: 2))
+                            .padding(5)
+                        Label("Start", systemImage: "play.fill")
+                            .labelStyle(.titleAndIcon)
+                            .font(.title3.bold())
+                            .foregroundStyle(textColor)
+                    }
+                    .frame(height: 58)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
+            }
+        }
+    }
+
+    private var accessibilityText: String {
+        "New game. Difficulty, \(prompt.difficulty.name). Clock, \(seconds) seconds, gets quicker every level"
+            + (prompt.personalBest.map { ". Personal best, \($0)" } ?? "")
+    }
+
+    private func row(_ label: String, _ value: String, detail: String? = nil) -> some View {
+        HStack {
+            // A smaller, fainter line under the label, as on the round summary.
+            VStack(alignment: .leading, spacing: 1) {
+                Text(label)
+                if let detail = detail {
+                    Text(detail)
+                        .font(.caption)
+                        .opacity(0.6)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
+            Spacer(minLength: 12)
+            Text(value).font(.body.bold().monospacedDigit())
+        }
+    }
+}
+
 // MARK: - Shared pieces
 
 /// The frosted card both summaries sit on. A tap on it, or anywhere else on screen, dismisses it;

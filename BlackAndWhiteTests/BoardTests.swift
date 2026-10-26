@@ -126,7 +126,9 @@ struct DifficultyTests {
     }
 
     @Test func clockShrinksWithLevelButNotBelowFive() {
+        #expect(Difficulty.easy.timeAllowed(level: 1) == 50)
         #expect(Difficulty.regular.timeAllowed(level: 1) == 40)
+        #expect(Difficulty.hard.timeAllowed(level: 1) == 30)
         #expect(Difficulty.regular.timeAllowed(level: 2) == 39)
         #expect(Difficulty.hard.timeAllowed(level: 100) == 5)
     }

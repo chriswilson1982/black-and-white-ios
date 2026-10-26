@@ -24,6 +24,11 @@ struct ContentView: View {
         }
     }
 
+    private var showsAccessPoint: Bool {
+        coordinator.showingHome && coordinator.gameCenterReady && coordinator.activeSheet == nil
+            && !coordinator.showingTutorial
+    }
+
     var body: some View {
         GeometryReader { proxy in
             ZStack {
@@ -51,6 +56,13 @@ struct ContentView: View {
                         coordinator.dismissRoundSummary()
                     }
                     .id(summary.id)
+                    .transition(.roundSummary(reduceMotion: reduceMotion))
+                }
+                if let prompt = coordinator.startPrompt, !coordinator.showingHome {
+                    StartCard(prompt: prompt, settings: coordinator.effectiveSettings) {
+                        coordinator.startGame()
+                    }
+                    .id(prompt.id)
                     .transition(.roundSummary(reduceMotion: reduceMotion))
                 }
                 if let summary = coordinator.gameOverSummary, !coordinator.showingHome {
@@ -87,12 +99,18 @@ struct ContentView: View {
         }
         .preferredColorScheme(forcedScheme)
         .statusBarHidden()
+        // Game Center's access point sits in the corner of the title screen only, out of the way
+        // of the game, sheets and the tutorial.
+        .onChange(of: showsAccessPoint, initial: true) { _, visible in
+            GameCenter.shared.setAccessPointVisible(visible)
+        }
         .sheet(item: $coordinator.activeSheet, onDismiss: { coordinator.sheetDismissed() }) { sheet in
             Group {
                 switch sheet {
                 case .settings:
                     SettingsView(settings: coordinator.settings,
                                  onSave: { coordinator.pendingSettings = $0 },
+                                 gameCenterAvailable: coordinator.gameCenterReady,
                                  // Only offered from a game; on the title screen there's nowhere to return to.
                                  onReturnToTitle: coordinator.showingHome ? nil : { coordinator.requestReturnToTitle() })
                 case .highScores:

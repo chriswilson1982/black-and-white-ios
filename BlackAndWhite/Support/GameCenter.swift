@@ -96,6 +96,26 @@ final class GameCenter: NSObject, GKGameCenterControllerDelegate {
         Self.topViewController()?.present(viewController, animated: true)
     }
 
+    /// The full Game Center dashboard: profile, achievements and leaderboards.
+    func showDashboard() {
+        guard isAuthenticated else { return }
+        let viewController = GKGameCenterViewController(state: .dashboard)
+        viewController.gameCenterDelegate = self
+        Self.topViewController()?.present(viewController, animated: true)
+    }
+
+    /// Shows or hides Game Center's own access point (the player's avatar, which opens the
+    /// dashboard) in the top corner. Only ever shown when signed in.
+    func setAccessPointVisible(_ visible: Bool) {
+        let accessPoint = GKAccessPoint.shared
+        let show = visible && isAuthenticated
+        guard accessPoint.isActive != show else { return }
+        accessPoint.location = .topLeading
+        // Briefly expands to show achievements earned or leaderboard rank when it appears.
+        accessPoint.showHighlights = true
+        accessPoint.isActive = show
+    }
+
     func gameCenterViewControllerDidFinish(_ gameCenterViewController: GKGameCenterViewController) {
         gameCenterViewController.dismiss(animated: true)
         onLeaderboardClosed?()

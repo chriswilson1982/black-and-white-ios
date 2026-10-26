@@ -26,6 +26,8 @@ final class GameCoordinator: GameSceneDelegate {
     var roundSummary: RoundSummary?
     /// How the game ended, while the game-over card is showing.
     var gameOverSummary: GameOverSummary?
+    /// A new game is waiting for the player to tap Start.
+    var startPrompt: StartPrompt?
 
     var activeSheet: Sheet?
     var confirmingRestart = false
@@ -221,6 +223,7 @@ final class GameCoordinator: GameSceneDelegate {
         scene?.setHeld(true)
         roundSummary = nil
         gameOverSummary = nil
+        startPrompt = nil
         mood = .playing
         withAnimation(.easeInOut(duration: 0.3)) { showingHome = true }
     }
@@ -284,9 +287,26 @@ final class GameCoordinator: GameSceneDelegate {
         // game has started in the meantime.
         let round = backgroundShuffle
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
-            guard let self = self, self.backgroundShuffle == round, !self.showingHome else { return }
+            // Not if a new game has started, or is waiting for Start, in the meantime.
+            guard let self = self, self.backgroundShuffle == round, !self.showingHome,
+                  self.startPrompt == nil else { return }
             withAnimation(.spring(duration: 0.5, bounce: 0.25)) { self.gameOverSummary = summary }
         }
+    }
+
+    func gameSceneWantsStart(_ scene: GameScene) {
+        gameOverSummary = nil
+        let prompt = StartPrompt(difficulty: settings.difficulty,
+                                 personalBest: scores.syncedBest[settings.difficulty]?.score)
+        withAnimation(.spring(duration: 0.5, bounce: 0.25)) { startPrompt = prompt }
+    }
+
+    /// The player tapped Start.
+    func startGame() {
+        guard startPrompt != nil else { return }
+        SoundEngine.shared.play(.button)
+        withAnimation(.easeIn(duration: 0.3)) { startPrompt = nil }
+        scene?.beginNewGame()
     }
 
     func dismissGameOverSummary() {

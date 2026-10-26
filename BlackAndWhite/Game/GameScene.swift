@@ -48,6 +48,8 @@ protocol GameSceneDelegate: AnyObject {
     func gameSceneDidStartRound(_ scene: GameScene)
     /// A round was won: show its score breakdown.
     func gameScene(_ scene: GameScene, didFinishRound summary: RoundSummary)
+    /// A new game is ready: show the start card. The scene waits until `beginNewGame()`.
+    func gameSceneWantsStart(_ scene: GameScene)
 }
 
 /// Drawing order. The scene ignores sibling order, so every node gets an explicit z.
@@ -292,7 +294,7 @@ final class GameScene: SKScene {
         #endif
         guard !isBuilt, size.width > 0 else { return }
         buildChrome()
-        startRound(afterWin: false)
+        requestNewGame()
     }
 
     override func didChangeSize(_ oldSize: CGSize) {
@@ -308,7 +310,45 @@ final class GameScene: SKScene {
     }
 
     func startNewGame() {
+        requestNewGame()
+    }
+
+    /// Real games wait for the player to tap Start before a new game is dealt, so the clock never
+    /// runs before they're ready (and the grid can't be studied for free). The tutorial starts
+    /// straight away.
+    private(set) var awaitingStart = false
+    /// Whether any round has been dealt yet (before that there's no grid to show).
+    private var hasDealtRound = false
+
+    /// Asks the player to start a new game, via the host's start card.
+    private func requestNewGame() {
+        guard !isTutorial else {
+            startRound(afterWin: false)
+            return
+        }
+        // Nothing from the last game should carry on while waiting.
+        removeAction(forKey: "deal")
+        removeAction(forKey: "resolve")
+        removeAction(forKey: "star")
+        removeAction(forKey: "summary")
+        endGridTracking()
+        awaitingStart = true
+        if !hasDealtRound { setBarsHidden(true) }
+        gameDelegate?.gameSceneWantsStart(self)
+    }
+
+    /// The player tapped Start: deal the first level.
+    func beginNewGame() {
+        guard awaitingStart else { return }
+        awaitingStart = false
         startRound(afterWin: false)
+    }
+
+    /// The start and finish markers, hidden until there's a grid for them to point at.
+    private func setBarsHidden(_ hidden: Bool) {
+        for bar in [startBar, startBackdrop, finishBar, finishBackdrop] {
+            bar?.isHidden = hidden
+        }
     }
 
     /// New colours without restarting: the screen is redrawn around the current round.
@@ -320,7 +360,9 @@ final class GameScene: SKScene {
     func apply(settings newSettings: GameSettings) {
         settings = newSettings
         buildChrome()
-        startRound(afterWin: false)
+        // The old grid was cleared with everything else, so there's nothing to show until Start.
+        hasDealtRound = false
+        requestNewGame()
     }
 
     /// The player confirmed they want to abandon the current game.
@@ -330,7 +372,7 @@ final class GameScene: SKScene {
         if finalScore != 0 {
             gameDelegate?.gameScene(self, didEndGameWithScore: finalScore, level: level, abandoned: true)
         }
-        startRound(afterWin: false)
+        requestNewGame()
     }
 
     // MARK: Building the screen
@@ -495,6 +537,11 @@ final class GameScene: SKScene {
     /// Rebuilds the screen after a size change, keeping the current round.
     private func relayout() {
         buildChrome()
+        guard hasDealtRound else {
+            // Still waiting for the first Start: no grid to show yet.
+            setBarsHidden(true)
+            return
+        }
         renderBoard(animated: false)
         if phase == .lost {
             // Locked squares and the failed path already drifted away.
@@ -530,6 +577,8 @@ final class GameScene: SKScene {
         removeAction(forKey: "resolve")
         removeAction(forKey: "star")
         removeAction(forKey: "summary")
+        hasDealtRound = true
+        setBarsHidden(false)
 
         if afterWin {
             level += 1
@@ -714,7 +763,7 @@ final class GameScene: SKScene {
         refreshAllCorners()
 
         // The tutorial takes as long as the player needs.
-        guard phase == .playing, !isHeld, !isTutorial else { return }
+        guard phase == .playing, !isHeld, !isTutorial, !awaitingStart else { return }
         elapsed += dt
         let allowed = settings.difficulty.timeAllowed(level: level)
         let remaining = allowed - elapsed
@@ -749,7 +798,8 @@ final class GameScene: SKScene {
     // MARK: Touches
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let touch = touches.first, isBuilt, !isHeld else { return }
+        // While the start card is up, only its Start button does anything.
+        guard let touch = touches.first, isBuilt, !isHeld, !awaitingStart else { return }
         let p = touch.location(in: self)
 
         if isTutorial {
@@ -894,7 +944,7 @@ final class GameScene: SKScene {
                 isHeld = true
                 gameDelegate?.gameSceneWantsRestartConfirmation(self)
             } else {
-                startRound(afterWin: false)
+                requestNewGame()
             }
         case .dealing, .resolving:
             break
@@ -905,7 +955,11 @@ final class GameScene: SKScene {
     private func advance() {
         SoundEngine.shared.play(.button)
         timerNode.run(pressAction(0.7))
-        startRound(afterWin: phase == .won)
+        if phase == .won {
+            startRound(afterWin: true)
+        } else {
+            requestNewGame()
+        }
     }
 
     private func settingsTapped() {

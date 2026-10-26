@@ -29,10 +29,11 @@ enum Difficulty: Int, CaseIterable, Codable, Identifiable {
     /// Each power-up starts with this many uses at the start of a game.
     var startingPowerups: Int { 9 - 3 * rawValue }
 
-    /// Seconds on the clock. It shrinks each level, down to a floor of 5 seconds.
+    /// Seconds on the clock: 50, 40 or 30 at level 1, shrinking by 0.5, 1 or 1.5 seconds each
+    /// level after that, down to a floor of 5 seconds.
     func timeAllowed(level: Int) -> TimeInterval {
         let d = Double(rawValue)
-        return max(61 - d * 10 - Double(level) * 0.5 * d, 5)
+        return max(60 - d * 10 - Double(level - 1) * 0.5 * d, 5)
     }
 }
 

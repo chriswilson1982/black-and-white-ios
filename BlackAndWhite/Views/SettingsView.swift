@@ -7,11 +7,14 @@ struct SettingsView: View {
     private let onSave: (GameSettings) -> Void
     /// Leaves the game for the title screen. Nil when Settings was opened from the title screen.
     private let onReturnToTitle: (() -> Void)?
+    /// The player is signed in to Game Center.
+    private let gameCenterAvailable: Bool
 
     init(settings: GameSettings, onSave: @escaping (GameSettings) -> Void,
-         onReturnToTitle: (() -> Void)? = nil) {
+         gameCenterAvailable: Bool = false, onReturnToTitle: (() -> Void)? = nil) {
         _draft = State(initialValue: settings)
         self.onSave = onSave
+        self.gameCenterAvailable = gameCenterAvailable
         self.onReturnToTitle = onReturnToTitle
     }
 
@@ -61,6 +64,15 @@ struct SettingsView: View {
                     Toggle("Sound effects", isOn: $draft.soundEnabled)
                 } footer: {
                     Text("Closing settings starts a new game.")
+                }
+
+                if gameCenterAvailable {
+                    Section {
+                        // Opens the same dashboard as the access point on the title screen.
+                        Button("Open Game Center Dashboard") { GameCenter.shared.showDashboard() }
+                    } header: {
+                        GameCenterHeader()
+                    }
                 }
 
                 Section {
