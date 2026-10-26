@@ -238,7 +238,6 @@ final class GameScene: SKScene {
     private var achievements: AchievementTracker? { isTutorial ? nil : .shared }
 
     private var titleLabel: SKLabelNode!
-    private var ampersandLabel: SKLabelNode!
     private var settingsButton: SKSpriteNode!
     private var scoresButton: SKSpriteNode!
     private var powerupNodes: [PowerupNode] = []
@@ -376,12 +375,21 @@ final class GameScene: SKScene {
         let w = size.width
 
         // Title: "black & white" with a bold ampersand.
-        titleLabel = makeLabel("black  white", weight: .light, size: s, color: textColor)
+        // One line with a bold "&", like the title screen, so the letters space themselves.
+        let title = NSMutableAttributedString()
+        for (part, weight) in [("black", UIFont.Weight.light), ("&", .bold), ("white", .light)] {
+            title.append(NSAttributedString(string: part, attributes: [
+                .font: RoundedLabelNode.font(size: s, weight: weight),
+                .foregroundColor: textColor,
+            ]))
+        }
+        titleLabel = SKLabelNode()
+        titleLabel.attributedText = title
+        titleLabel.verticalAlignmentMode = .center
+        titleLabel.horizontalAlignmentMode = .center
+        titleLabel.zPosition = Z.controls
         titleLabel.position = CGPoint(x: w / 2, y: layout.titleY)
         addChild(titleLabel)
-        ampersandLabel = makeLabel("&", weight: .bold, size: s, color: textColor)
-        ampersandLabel.position = titleLabel.position
-        addChild(ampersandLabel)
 
         settingsButton = makeIconSprite("gearshape.fill", pointSize: s * 0.55)
         settingsButton.position = CGPoint(x: layout.sideButtonInset, y: layout.titleY)
@@ -1299,7 +1307,7 @@ final class GameScene: SKScene {
         score += total
         achievements?.roundWon(noWhitesLeft: result.noWhites, powerupReward: powerupReward,
                                squareTaps: squareTapsThisRound, usedPowerups: usedPowerupsThisRound,
-                               wasTrickyGrid: isTrickyGrid, timeLeft: timeLeftAtCommit)
+                               wasTrickyGrid: isTrickyGrid, timeLeft: timeLeftAtCommit, roundScore: total)
         achievements?.scoreChanged(to: score, difficulty: settings.difficulty)
         if powerupReward { achievements?.powerupsChanged(powerupCounts) }
         animateScoreChange(total)
@@ -1385,6 +1393,7 @@ final class GameScene: SKScene {
         refreshCounters()
         applyChromeForPhase()
         SoundEngine.shared.play(.fail)
+        achievements?.gameLost(finalScore: finalScore)
         gameDelegate?.gameScene(self, didEndGameWithScore: finalScore, level: level, abandoned: false)
     }
 

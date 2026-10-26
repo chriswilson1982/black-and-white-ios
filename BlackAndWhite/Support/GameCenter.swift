@@ -37,8 +37,9 @@ final class GameCenter: NSObject, GKGameCenterControllerDelegate {
             let player = GKLocalPlayer.local
             self.isAuthenticated = player.isAuthenticated
             if player.isAuthenticated {
-                // Anything earned while signed out goes now.
-                AchievementTracker.shared.reportPending()
+                // Re-send everything earned, so nothing earned while signed out (or before the
+                // achievements were set up in App Store Connect) is lost.
+                AchievementTracker.shared.reportAll()
             }
             self.onAuthenticationFinished?(player.isAuthenticated,
                                            player.isAuthenticated ? player.alias : nil)

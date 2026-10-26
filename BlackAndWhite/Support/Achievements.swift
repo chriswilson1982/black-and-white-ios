@@ -7,13 +7,15 @@ enum Achievement: String, CaseIterable {
     // Score in one game, any difficulty.
     case score100, score250, score500, score1000, score1500, score2000
     // Score in one game on Hard.
-    case hardScore250, hardScore500, hardScore1000
+    case hardScore500, hardScore1000
     // Reach a level, any difficulty.
     case level10, level20, level30, level40, level50
     // Firsts.
-    case noWhitesLeft, powerupReward, starPoints
+    case noWhitesLeft, powerupReward, starBonus
     // Extras.
     case starCollector, fullHouse, purist, trickyGrid, photoFinish, oneTapWonder, noTapsNeeded, goodbyeStar
+    // Hidden jokes: a game that ends on zero or less, and a level that scores exactly zero or below zero.
+    case score0, zero, goingDown
 
     /// The ID set up in App Store Connect.
     var id: String { "com.chriswilson.blackandwhite.achievement.\(rawValue)" }
@@ -26,7 +28,7 @@ enum Achievement: String, CaseIterable {
 
     /// Single-game score milestones on Hard.
     static let hardScoreTiers: [(score: Int, achievement: Achievement)] = [
-        (250, .hardScore250), (500, .hardScore500), (1000, .hardScore1000),
+        (500, .hardScore500), (1000, .hardScore1000),
     ]
 
     static let levelTiers: [(level: Int, achievement: Achievement)] = [
@@ -34,27 +36,31 @@ enum Achievement: String, CaseIterable {
     ]
 
     /// Stars needed, over all games, for Star Collector.
-    static let starCollectorTarget = 25
+    static let starCollectorTarget = 100
 }
 
 /// Works out which achievements the player has earned from what happens in the game, and
-/// reports them to Game Center. Earned achievements are remembered on the device, so each is
-/// only sent once and any earned while signed out are sent after the next sign-in.
+/// reports them to Game Center (with a banner) as they're earned. Earned achievements are
+/// remembered on the device and sent again at each sign-in, so none are lost.
 final class AchievementTracker {
     static let shared = AchievementTracker()
 
     private let defaults = UserDefaults.standard
     private let earnedKey = "achievements.earned"
-    private let reportedKey = "achievements.reported"
     private let starsKey = "achievements.starsCollected"
 
     private var earned: Set<String>
-    private var reported: Set<String>
     private var starsCollected: Int
 
     private init() {
-        earned = Set(defaults.stringArray(forKey: earnedKey) ?? [])
-        reported = Set(defaults.stringArray(forKey: reportedKey) ?? [])
+        var saved = Set(defaults.stringArray(forKey: earnedKey) ?? [])
+        // Star Bonus was briefly called starPoints; carry it over.
+        if saved.contains("com.chriswilson.blackandwhite.achievement.starPoints") {
+            saved.insert(Achievement.starBonus.id)
+        }
+        // Only achievements that still exist, so a removed one isn't sent again.
+        let current = Set(Achievement.allCases.map(\.id))
+        earned = saved.intersection(current)
         starsCollected = defaults.integer(forKey: starsKey)
     }
 
@@ -75,9 +81,12 @@ final class AchievementTracker {
     ///   - usedPowerups: any power-up used this round.
     ///   - wasTrickyGrid: the round was a penalty 4×4 grid.
     ///   - timeLeft: seconds left on the clock when the path was tested.
+    ///   - roundScore: the round's points (star bonus points not included).
     func roundWon(noWhitesLeft: Bool, powerupReward: Bool, squareTaps: Int, usedPowerups: Bool,
-                  wasTrickyGrid: Bool, timeLeft: TimeInterval) {
+                  wasTrickyGrid: Bool, timeLeft: TimeInterval, roundScore: Int) {
         var unlocked: [Achievement] = []
+        if roundScore == 0 { unlocked.append(.zero) }
+        if roundScore < 0 { unlocked.append(.goingDown) }
         if noWhitesLeft { unlocked.append(.noWhitesLeft) }
         if powerupReward { unlocked.append(.powerupReward) }
         if wasTrickyGrid { unlocked.append(.trickyGrid) }
@@ -96,15 +105,13 @@ final class AchievementTracker {
 
     /// The winning wave collected the star, for a power-up or (when they're all full) for points.
     func starCollected(forPoints: Bool) {
-        if forPoints { earn([.starPoints]) }
+        if forPoints { earn([.starBonus]) }
         starsCollected += 1
         defaults.set(starsCollected, forKey: starsKey)
         if starsCollected >= Achievement.starCollectorTarget {
             earn([.starCollector])
         } else {
-            // Progress towards Star Collector, shown in Game Center.
-            let progress = Double(starsCollected) / Double(Achievement.starCollectorTarget) * 100
-            report([progressEntry(.starCollector, percent: progress)])
+            report([starCollectorProgress()])
         }
     }
 
@@ -118,11 +125,24 @@ final class AchievementTracker {
         earn([.goodbyeStar])
     }
 
-    /// Sends anything earned while signed out. Call after Game Center sign-in.
-    func reportPending() {
-        let pending = earned.subtracting(reported)
-        guard !pending.isEmpty else { return }
-        report(pending.map { completedEntry(id: $0) }, completing: pending)
+    /// A game was lost (not abandoned with a restart), ending on `finalScore`.
+    func gameLost(finalScore: Int) {
+        if finalScore <= 0 { earn([.score0]) }
+    }
+
+    /// Sends everything earned on this device again, plus Star Collector progress. Call after
+    /// Game Center sign-in.
+    ///
+    /// Game Center ignores achievements it already has, so this is safe to repeat. It's what
+    /// delivers anything earned while signed out, or before the achievement was set up in
+    /// App Store Connect (GameKit doesn't always report an error for an unknown ID, so "sent"
+    /// can't be trusted to mean "received").
+    func reportAll() {
+        var entries = earned.map { completedEntry(id: $0, banner: false) }
+        if !earned.contains(Achievement.starCollector.id), starsCollected > 0 {
+            entries.append(starCollectorProgress())
+        }
+        report(entries)
     }
 
     // MARK: Reporting
@@ -132,36 +152,35 @@ final class AchievementTracker {
         guard !new.isEmpty else { return }
         earned.formUnion(new)
         defaults.set(Array(earned), forKey: earnedKey)
-        report(new.map { completedEntry(id: $0) }, completing: new)
+        report(new.map { completedEntry(id: $0, banner: true) })
     }
 
-    private func completedEntry(id: String) -> GKAchievement {
+    /// `banner`: show Game Center's "achievement earned" banner (only when it's newly earned).
+    private func completedEntry(id: String, banner: Bool) -> GKAchievement {
         let entry = GKAchievement(identifier: id)
         entry.percentComplete = 100
-        entry.showsCompletionBanner = true
+        entry.showsCompletionBanner = banner
         return entry
     }
 
-    private func progressEntry(_ achievement: Achievement, percent: Double) -> GKAchievement {
-        let entry = GKAchievement(identifier: achievement.id)
-        entry.percentComplete = percent
+    /// Stars collected so far as a share of the Star Collector target, shown in Game Center.
+    private func starCollectorProgress() -> GKAchievement {
+        let entry = GKAchievement(identifier: Achievement.starCollector.id)
+        entry.percentComplete = min(100, Double(starsCollected) / Double(Achievement.starCollectorTarget) * 100)
         return entry
     }
 
-    /// Sends to Game Center when signed in. Completed IDs are marked as sent once Game Center
-    /// accepts them; until then they stay pending and go with the next `reportPending()`.
-    private func report(_ entries: [GKAchievement], completing ids: Set<String> = []) {
+    /// Sends to Game Center when signed in. If not, nothing is lost: `reportAll()` sends it
+    /// after the next sign-in.
+    private func report(_ entries: [GKAchievement]) {
         guard GKLocalPlayer.local.isAuthenticated, !entries.isEmpty else { return }
-        GKAchievement.report(entries) { [weak self] error in
+        #if DEBUG
+        let summary = entries.map { "\($0.identifier.split(separator: ".").last ?? "") \(Int($0.percentComplete))%" }
+        print("Reporting achievements: \(summary.joined(separator: ", "))")
+        #endif
+        GKAchievement.report(entries) { error in
             if let error = error {
                 print("Game Center achievement report failed: \(error.localizedDescription)")
-                return
-            }
-            guard !ids.isEmpty else { return }
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                self.reported.formUnion(ids)
-                self.defaults.set(Array(self.reported), forKey: self.reportedKey)
             }
         }
     }

@@ -33,12 +33,16 @@ final class RoundedLabelNode: SKLabelNode {
             attributedText = nil
             return
         }
-        let system = UIFont.systemFont(ofSize: fontSize, weight: weight)
-        let font = system.fontDescriptor.withDesign(.rounded).map { UIFont(descriptor: $0, size: fontSize) } ?? system
         attributedText = NSAttributedString(string: text, attributes: [
-            .font: font,
+            .font: Self.font(size: fontSize, weight: weight),
             .foregroundColor: fontColor ?? .white,
         ])
+    }
+
+    /// The system font in its rounded design.
+    static func font(size: CGFloat, weight: UIFont.Weight) -> UIFont {
+        let system = UIFont.systemFont(ofSize: size, weight: weight)
+        return system.fontDescriptor.withDesign(.rounded).map { UIFont(descriptor: $0, size: size) } ?? system
     }
 }
 

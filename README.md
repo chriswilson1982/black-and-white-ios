@@ -62,7 +62,7 @@ If you use different leaderboard IDs, update `GameCenter.leaderboardID(for:)` to
 
 ### Achievements
 
-25 achievements worth 880 of Game Center's 1,000 points, leaving room to add more later. They're worked out in `Support/Achievements.swift` and don't count in the tutorial. Anything earned while signed out is sent at the next sign-in. Create each in App Store Connect under *Services → Game Center → Achievements* with the ID `com.chriswilson.blackandwhite.achievement.` followed by the suffix below, the points shown, an image (512×512 or 1024×1024) and a localisation (title, plus descriptions before and after earning). Then add them to the app version before submitting.
+27 achievements worth 825 of Game Center's 1,000 points, leaving 175 for adding more later. They're worked out in `Support/Achievements.swift` and don't count in the tutorial. Everything earned on a device is sent again at each Game Center sign-in, so nothing earned while signed out (or before an achievement was set up) is lost. In App Store Connect, under *Services → Game Center → Achievements*, each has the ID `com.chriswilson.blackandwhite.achievement.` followed by the suffix below, an image (1024×1024) and a localisation (title, plus descriptions before and after earning). Add them to the app version before submitting.
 
 | ID suffix | Title | Description | Points |
 | --- | --- | --- | --- |
@@ -72,27 +72,29 @@ If you use different leaderboard IDs, update `GameCenter.leaderboardID(for:)` to
 | `score1000` | Grandmaster | Score 1,000 in one game | 50 |
 | `score1500` | Legend | Score 1,500 in one game | 75 |
 | `score2000` | Unstoppable | Score 2,000 in one game | 100 |
-| `hardScore250` | Hard Case | Score 250 in one game on Hard | 30 |
-| `hardScore500` | Hard Core | Score 500 in one game on Hard | 50 |
-| `hardScore1000` | Diamond Hard | Score 1,000 in one game on Hard | 80 |
+| `hardScore500` | Hardcore | Score 500 in one game on Hard | 50 |
+| `hardScore1000` | Diamond | Score 1,000 in one game on Hard | 80 |
 | `level10` | Getting Going | Reach level 10 | 10 |
-| `level20` | Into the Groove | Reach level 20 | 25 |
-| `level30` | Against the Clock | Reach level 30 | 40 |
-| `level40` | Nerves of Steel | Reach level 40 | 60 |
-| `level50` | Half Century | Reach level 50 | 80 |
+| `level20` | Into The Groove | Reach level 20 | 20 |
+| `level30` | Against The Clock | Reach level 30 | 30 |
+| `level40` | Nerves Of Steel | Reach level 40 | 40 |
+| `level50` | Half Century | Reach level 50 | 50 |
 | `noWhitesLeft` | Clean Sweep | Win a round with no white squares left over | 10 |
 | `powerupReward` | Power Surge | Earn the power-up reward (no whites left, and a score of at least the grid size) | 20 |
-| `starPoints` | Star Bonus | Collect a star for points with all power-ups full | 15 |
-| `starCollector` | Star Collector | Collect 25 stars (shows progress) | 25 |
+| `starCollector` | Star Collector | Collect 100 stars over any number of games (shows progress) | 20 |
 | `fullHouse` | Full House | Have 9 of every power-up at once | 30 |
-| `purist` | Purist | Reach level 10 without using a power-up | 40 |
-| `trickyGrid` | Tricky Business | Win a tricky 4×4 penalty grid | 15 |
-| `photoFinish` | Photo Finish | Win with under a second left | 20 |
-| `oneTapWonder` | One Tap Wonder | Win a round with a single tap and no power-ups | 15 |
-| `noTapsNeeded` | Hands Free | Win a round without tapping a square or using a power-up | 25 |
-| `goodbyeStar` | Goodbye, Star | **Hidden.** Destroy a star by tapping its square | 5 |
+| `starBonus` | Star Bonus | Collect a star for points with all power-ups full | 40 |
+| `purist` | Purist | Reach level 10 without using a power-up | 20 |
+| `trickyGrid` | Tricky Business | Win a tricky 4×4 penalty grid | 10 |
+| `photoFinish` | Photo Finish | Win with under a second left | 10 |
+| `noTapsNeeded` | Hands Free | Win a round without tapping a square or using a power-up | 10 |
+| `oneTapWonder` | One Tap Wonder | Win a round with a single tap and no power-ups | 20 |
+| `goodbyeStar` | Goodbye Star | **Hidden.** Destroy a star by tapping its square | 10 |
+| `score0` | Sweet Nothing | **Hidden.** End a game with a score of zero or less | 20 |
+| `zero` | Zero In | **Hidden.** Score exactly zero in a level | 20 |
+| `goingDown` | Going Down | **Hidden.** Score below zero in a level | 20 |
 
-Titles and descriptions are suggestions; only the IDs and points need to match the code (points are set only in App Store Connect).
+Points and titles here match App Store Connect, where they're set; the code only needs the IDs to match.
 
 ## iCloud
 
