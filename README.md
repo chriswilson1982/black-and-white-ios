@@ -1,32 +1,43 @@
-# Black & White for iOS (SpriteKit)
+# Black & White for iOS
 
-A native iOS version of the Pythonista game in the root of this repository, rebuilt with SpriteKit for the game and SwiftUI for the menus.
+A grid puzzle game for iPhone and iPad: clear a path of white squares across the grid before the clock runs out. Tapping a square locks it and flips the eight squares around it. Built with SpriteKit for the game and SwiftUI for everything around it. It's a native version of the original Black & White, which was written in Python with Pythonista.
 
 ## Running it
 
-1. Open `ios/BlackAndWhite.xcodeproj` in **Xcode 16 or later**.
-2. Select the **BlackAndWhite** target → *Signing & Capabilities* and choose your team (or change the bundle identifier `com.chriswilson.blackandwhite`).
-3. Pick an iPhone or iPad simulator or device and press **Run**.
-
-Requires iOS 17. The game runs in portrait on iPhone and iPad.
+1. Open `BlackAndWhite.xcodeproj` in an Xcode with the **iOS 27 SDK**. The app still runs on **iOS 17 and later**.
+2. Select the **BlackAndWhite** target → *Signing & Capabilities* and choose your team. The bundle identifier is `com.chriswilson.newblackandwhite`; change it if you're building under your own account.
+3. Pick an iPhone or iPad and press **Run**. The game runs in portrait.
 
 Run the unit tests with **Product → Test** (⌘U). They cover the grid rules, scoring and the solver (`BlackAndWhiteTests/BoardTests.swift`).
 
-## Tutorial
+Debug builds show SpriteKit's frame rate, draw call, quad and node counters in the corner; release builds don't.
 
-On first launch, a short guided tutorial (`Views/TutorialView.swift`) runs before the first game. It uses a 4×4 practice grid where the player makes one real move and tests the path, then covers scoring, power-ups and the timer. The game's clock waits until the tutorial and the name prompt are done. It can be replayed from **Settings → Tutorial**.
+## Features
+
+- **Home screen** with Play, high scores, settings, How to Play and the tutorial, over a moving mesh gradient of the game's colours.
+- **Rounded islands:** in the rounded style, squares of the same colour join into smooth shapes. Corners round off where colours meet, diagonal neighbours join across, and black and locked squares form continuous walls.
+- **Guided tutorial** played on the real game screen with a fixed practice board. Instruction cards sit on top, the clock is held, and only the tap each step asks for works. It runs on first launch and can be replayed from the home screen.
+- **Power-ups:** flip every square, unlock a tapped square, or flip one square on its own.
+- **Bonuses:** no white squares left outside the path, a power-up reward for big rounds, and a bonus star.
+- **Colour schemes** (Classic, Ocean, Sunset, Forest, Neon, Pastel and Accessible, using colour-blind-friendly Okabe–Ito colours), plus pickers for full customisation, light/dark/automatic appearance and a configurable star colour.
+- **Personal high scores** for each difficulty: your best and recent games, your Game Center best and worldwide rank, and a personal best synced across your devices with iCloud.
+- Retro sound effects generated in code, haptics, and Reduce Motion support (fades instead of movement).
 
 ## Every grid can be won
 
 When a round starts, the game checks that the grid can be won with normal taps alone (no power-ups) and re-rolls it if not. The check lives in `Board.solve()`:
 
 - Squares on the winning path are never tapped, so each one is flipped once by every tapped neighbour, in any order.
-- That turns "is there a path?" into a small set of XOR (GF(2)) equations. These are solved as a depth-first search builds the path out from the start square.
+- That turns "is there a path?" into a small set of XOR (GF(2)) equations, solved as a depth-first search builds the path out from the start square.
 - The search has a step budget. A grid that runs out of budget counts as unproven and is re-rolled too (about 3% of the largest grids). That keeps the check to a few milliseconds.
+
+## Rounded-island rendering
+
+Each grid point inside the board looks at the four squares that meet there (`GameScene.shapeGridPoint`). A square's corner is rounded off when both squares beside it belong to a different island. The gap is filled by whichever island owns the point: a diagonal pair (joined across), else the colour with the most squares there, else a priority order with walls first. The owning square draws the fill as a small curved piece in its own colour, so it always matches, even mid-flip. Shapes are recalculated every frame, and textures are drawn at the screen's exact size and pixel density (`Game/Art.swift`) so curves stay smooth.
 
 ## Game Center
 
-There is one Game Center leaderboard per difficulty. Scores are submitted when a game ends with a score above zero, the same rule as the local high score table. The high scores screen has a **Game Center leaderboard** button once the player is signed in. On first launch, the player's Game Center nickname is suggested as their name.
+There is one leaderboard per difficulty. A score is submitted when a game ends with a score above zero. The high scores screen reads your best score, worldwide rank and date straight from GameKit, and has a button to open Game Center's full leaderboard.
 
 Leaderboard IDs (set in `Support/GameCenter.swift`):
 
@@ -36,41 +47,42 @@ Leaderboard IDs (set in `Support/GameCenter.swift`):
 | Regular | `com.chriswilson.blackandwhite.regular` |
 | Hard | `com.chriswilson.blackandwhite.hard` |
 
-### Setup in App Store Connect / developer account
+### Setup in App Store Connect
 
-1. **App ID:** in *Certificates, Identifiers & Profiles*, make sure the app's identifier (`com.chriswilson.blackandwhite`, or your own) has **Game Center** enabled. With automatic signing, Xcode usually does this when it sees the entitlement in `BlackAndWhite.entitlements`. If you change the bundle ID, change it in the build settings too.
-2. **App record:** create the app in App Store Connect with that bundle ID.
-3. **Enable Game Center:** in the app's *Services* tab (older layouts: the version page's *Game Center* section), turn on Game Center.
-4. **Create three leaderboards** under *Services → Game Center → Leaderboards*. For each one:
-   - Type **Classic**, Leaderboard ID exactly as in the table above.
-   - Score format **Integer**, sort **High to Low**, submission type **Best Score**.
-   - Optional score range: minimum 1.
-   - Add at least one localization (e.g. English: "Easy", "Regular", "Hard"; format "1 point / 2 points"), plus an optional 512×512 image.
-5. **Attach to the version:** in the app version's *Game Center* section, add all three leaderboards so they ship with that version. Leaderboards that are live can't be deleted, and their IDs can't be reused.
-6. **Testing:** leaderboards work in development builds and on TestFlight before release. Sign in to Game Center on the test device (Settings → Game Center). In the Simulator you can sign in with a sandbox account, or Game Center simply stays off.
+1. **App ID:** the app's identifier needs **Game Center** and **iCloud** (key-value storage) enabled. With automatic signing, Xcode does this from `BlackAndWhite.entitlements`.
+2. **App record:** create the app in App Store Connect with the same bundle ID.
+3. **Leaderboards:** under *Services → Game Center → Leaderboards*, create three **Classic** leaderboards with the IDs above:
+   - **Score format:** Integer.
+   - **Order and submission:** sort High to Low, submission type Best Score.
+   - **Localisation:** at least one, with a display name. Add one for your device's language too (e.g. English (UK) as well as English (U.S.)), otherwise titles show as "MISSING TITLE".
+4. **Attach to the version:** in the app version's *Game Center* section, add all three leaderboards before submitting.
+5. **Testing:** development builds use the Game Center sandbox as soon as the leaderboards exist; no uploaded binary is needed. Sign in on the device under Settings → Game Center.
 
 If you use different leaderboard IDs, update `GameCenter.leaderboardID(for:)` to match.
 
-## How it maps to the Python version
+## iCloud
 
-| Python (Pythonista) | Swift |
+Your best score at each difficulty, and when you set it, is kept in iCloud key-value storage (`NSUbiquitousKeyValueStore`, in `Support/HighScoreStore.swift`). Devices merge on launch and whenever another device changes it, always keeping the highest. The full game history stays on each device. Without iCloud, everything still works locally.
+
+## Project layout
+
+| Folder / file | What's there |
 | --- | --- |
-| `black_white.py` – `Game(Scene)` | `Game/GameScene.swift` |
-| Grid rules, path check, scoring | `Game/Board.swift` (no UI code) |
-| `square.py`, `powerup.py`, timer drawing | `Game/Nodes.swift` |
-| `config.ini` messages | `Game/Messages.swift` |
-| `config.ini` settings + `configuration.py` | `Support/GameSettings.swift` (saved in UserDefaults) |
-| `database.py` (SQLite) | `Support/HighScoreStore.swift` (JSON file) + `Support/GameCenter.swift` |
-| `ui/settings.pyui` | `Views/SettingsView.swift` |
-| `ui/highscores.pyui` | `Views/HighScoresView.swift` |
-| `html/info.html` | `Views/HelpView.swift` |
+| `Game/Board.swift` | Grid rules, path check, scoring and the solver (no UI code) |
+| `Game/GameScene.swift` | The SpriteKit game: layout, input, rounds, animation, corner rounding, tutorial mode |
+| `Game/Nodes.swift` | Squares, power-up buttons and the timer |
+| `Game/Art.swift` | Textures drawn in code: rounded squares, corner fills, the star, SF Symbol icons |
+| `Game/Messages.swift` | The game's messages |
+| `Support/GameSettings.swift` | Settings and colour schemes, saved in UserDefaults |
+| `Support/HighScoreStore.swift` | Game history (JSON file) and iCloud-synced bests |
+| `Support/GameCenter.swift` | Sign-in, score submission and leaderboard queries |
+| `Support/SoundEngine.swift` | Retro sound effects synthesised at launch |
+| `Views/ContentView.swift`, `GameCoordinator.swift` | App screen and the glue between the game and SwiftUI |
+| `Views/HomeView.swift` | Home screen and the How to Play sheet |
+| `Views/GameBackground.swift` | Mesh gradient background (with a fallback gradient on iOS 17) |
+| `Views/TutorialView.swift` | The guided tutorial |
+| `Views/SettingsView.swift`, `HighScoresView.swift`, `HelpView.swift` | Settings, high scores and help |
 
-## Differences from the original
+## Credits
 
-- **Sounds**: Pythonista's built-in sound effects aren't available on iOS, so `Support/SoundEngine.swift` generates similar retro tones at launch. Swap in real audio files there if you prefer. Sounds respect the silent switch and can be turned off in Settings.
-- **Icons**: SF Symbols replace the Pythonista icon set.
-- **Colours**: the settings screen uses the system colour picker instead of RGB sliders.
-- **Haptics**: light taps on moves, and success/error feedback at the end of a round.
-- **After a round**, either the timer or the centre button moves you on.
-- Small fixes: the first level is "Level 1" (the original sometimes showed "Level 0"), and the no-white-squares bonus is worked out when you commit rather than whenever whites happen to hit zero.
-- High scores are stored per device; scores from the Python version's `db/scores.db` are not imported.
+Created by Chris Wilson, originally in Python using Pythonista.
