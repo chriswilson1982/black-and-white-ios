@@ -7,6 +7,7 @@ struct HelpView: View {
             VStack(alignment: .leading, spacing: 32) {
                 section("The goal") {
                     Text("Clear a path of white squares through the grid from the start point on the left to the finish point on the right, before the clock runs out. Squares join through their edges, not their corners.")
+                    Text("Levels are randomly generated and vary in grid size. As you progress, the clock gets faster.")
                     row("hand.tap.fill", "Tapping a square locks it and flips the eight squares around it from white to black or black to white.")
                     row("checkmark", "Tap the ✓ button to test your path! This will happen anyway when the time runs out!")
                 }
@@ -47,19 +48,16 @@ struct HelpView: View {
         }
     }
 
-    /// A line with an icon. `text` may use **bold** Markdown.
+    /// A line with an icon, centred against the text however many lines it wraps to.
+    /// `text` may use **bold** Markdown.
     private func row(_ symbol: String, _ text: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 16) {
-            VStack {
-                
-                Spacer()
-                Image(systemName: symbol)
-                    .imageScale(.large)
-                    .frame(width: 32)
-                    .accessibilityHidden(true)
-                Spacer()
-            }
+        HStack(alignment: .center, spacing: 16) {
+            Image(systemName: symbol)
+                .imageScale(.large)
+                .frame(width: 32)
+                .accessibilityHidden(true)
             Text(LocalizedStringKey(text))
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
