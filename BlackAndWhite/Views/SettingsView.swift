@@ -28,6 +28,10 @@ struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    // Taller segments, for more room around the larger labels.
+                    .controlSize(.large)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
                 } header: {
                     Text("Difficulty")
                 } footer: {
@@ -53,7 +57,11 @@ struct SettingsView: View {
                     ColorPicker("Bonus star", selection: colorBinding(\.starColor), supportsOpacity: false)
                     Toggle("Rounded squares", isOn: $draft.roundedSquares)
                     ThemePreview(settings: resolvedDraft)
-                    Button("Restore default colours") { draft.resetColors() }
+                    Button {
+                        draft.resetColors()
+                    } label: {
+                        Label("Restore default colours", systemImage: "paintpalette.fill")
+                    }
                 } header: {
                     Text("Colours")
                 } footer: {
@@ -62,14 +70,24 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("Sound effects", isOn: $draft.soundEnabled)
-                } footer: {
-                    Text("Closing settings starts a new game.")
                 }
 
                 if gameCenterAvailable {
                     Section {
                         // Opens the same dashboard as the access point on the title screen.
-                        Button("Open Game Center Dashboard") { GameCenter.shared.showDashboard() }
+                        Button {
+                            GameCenter.shared.showDashboard()
+                        } label: {
+                            Label {
+                                Text("Open Game Center Dashboard")
+                            } icon: {
+                                // A template image, so it takes the button's tint like the other icons.
+                                Image("gameCenterBlack")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 22, height: 22)
+                            }
+                        }
                     } header: {
                         GameCenterHeader()
                     }
@@ -200,13 +218,21 @@ private struct ThemePreview: View {
         .accessibilityHidden(true)
     }
 
+    /// Rounded like the game's squares when Rounded squares is on (true quarter circles, as in
+    /// `Art.square`), otherwise square.
+    private var swatchShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: settings.roundedSquares ? side * Art.cornerFraction : 0,
+                         style: .circular)
+    }
+
     private func swatch(_ color: Color) -> some View {
-        RoundedRectangle(cornerRadius: side * 0.22)
+        swatchShape
             .fill(color)
             // A faint edge, so a swatch matching the background (white on light) still shows.
-            .overlay(RoundedRectangle(cornerRadius: side * 0.22)
+            .overlay(swatchShape
                 .strokeBorder(Color(uiColor: settings.textColor).opacity(0.25), lineWidth: 1))
             .frame(width: side, height: side)
+            .animation(.easeInOut(duration: 0.2), value: settings.roundedSquares)
     }
 
     /// The game's own rounded star, drawn the same way as on the grid.

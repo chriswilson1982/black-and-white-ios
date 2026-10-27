@@ -35,15 +35,18 @@ struct TutorialView: View {
                         .transition(.roundSummary(reduceMotion: reduceMotion))
                 }
 
-                // The card stays inside the safe area, clear of the notch and home indicator.
-                VStack {
-                    if !tutorial.step.cardAtTop { Spacer() }
-                    card
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .frame(maxWidth: 560)
-                    if tutorial.step.cardAtTop { Spacer() }
-                }
+                // The card fills the gap between the power-ups and the grid, so it never covers
+                // the grid or the controls. The frame is in full-screen coordinates, like the scene.
+                Color.clear
+                    .overlay(alignment: .topLeading) {
+                        let frame = tutorial.cardFrame
+                        if frame.height > 0 {
+                            card(maxHeight: frame.height)
+                                .frame(width: frame.width)
+                                .position(x: frame.midX, y: frame.midY)
+                        }
+                    }
+                    .ignoresSafeArea()
             }
             .onAppear {
                 let insets = proxy.safeAreaInsets
@@ -64,7 +67,21 @@ struct TutorialView: View {
 
     // MARK: Card
 
-    private var card: some View {
+    /// The instruction card, scrolling if its text doesn't fit the space (on small phones,
+    /// or with large text).
+    private func card(maxHeight: CGFloat) -> some View {
+        ViewThatFits(in: .vertical) {
+            cardContent
+            ScrollView { cardContent }
+        }
+        .frame(maxHeight: max(maxHeight - 32, 0))
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .id(tutorial.step)
+        .transition(.opacity)
+    }
+
+    private var cardContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 HStack(spacing: 6) {
@@ -103,15 +120,12 @@ struct TutorialView: View {
                 primaryButton("Next") { tutorial.advance(to: .ready) }
             case .ready:
                 primaryButton("Play") { finish() }
-            case .tap, .commit:
+            case .tap, .flipOne, .unlock, .commit:
                 // The next move happens on the game screen itself.
                 EmptyView()
             }
         }
-        .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .id(tutorial.step)
-        .transition(.opacity)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var message: String {
@@ -122,20 +136,23 @@ struct TutorialView: View {
         case .tap:
             return "Tapping a square locks it and flips the colour of the eight squares around it. "
                 + "Tap the highlighted square."
+        case .flipOne:
+            return "The path is clear, but the white squares at the bottom are cut off. This power-up flips "
+                + "one square without touching its neighbours. Tap it, then the highlighted square."
+        case .unlock:
+            return "Every locked square costs a point. This power-up unlocks a square you tapped, without "
+                + "flipping anything else. Tap it, then the locked square."
         case .commit:
-            return "The path is clear! Tap the ✓ button below to test it. In a real game this happens "
-                + "automatically when the timer runs out."
+            return "Every white square is in the path now. Tap the ✓ button below to test it. In a real game "
+                + "this happens automatically when the timer runs out."
         case .scored:
-            if let r = tutorial.result {
-                return "+\(r.pathCount) for squares in the path, −\(r.leftoverWhites) for white squares left over "
-                    + "and −\(r.lockedCount) for locked squares: \(r.total) this round. Use as many squares as you "
-                    + "can and tap as few as possible. Score zero or less and the next grid is a tricky 4×4."
-            }
-            return "Use as many squares as you can in the path and tap as few as possible."
+            let total = tutorial.result.map { "You scored \($0.total): " } ?? "You score "
+            return total + "a point for each square in the path, minus one for each white square left over "
+                + "and each locked square, plus a bonus for leaving no white squares at all. "
+                + "Score zero or less and the next grid is a tricky 4×4."
         case .powerups:
-            return "The buttons at the top are power-ups: flip all squares, unlock a square you tapped, "
-                + "and flip one square on its own. You start with a few of each; get a star into your path "
-                + "to earn more."
+            return "The first power-up flips every square on the grid at once. You start each game with "
+                + "a few of each power-up (fewer on harder difficulties); get a star into your path to earn more."
         case .ready:
             return "The clock gets quicker every level. After each round, tap the timer or the arrow to carry on. "
                 + "You can replay this tutorial from Settings."
@@ -168,28 +185,38 @@ struct TutorialView: View {
 @Observable
 final class TutorialController: GameSceneDelegate {
     enum Step: Int, CaseIterable {
-        case goal, tap, commit, scored, powerups, ready
+        case goal, tap, flipOne, unlock, commit, scored, powerups, ready
 
         var title: String {
             switch self {
             case .goal: return "Clear a path"
             case .tap: return "Tap to flip"
+            case .flipOne: return "Flip one square"
+            case .unlock: return "Unlock a square"
             case .commit: return "Test your path"
             case .scored: return "Scoring"
-            case .powerups: return "Power-ups"
+            case .powerups: return "More power-ups"
             case .ready: return "You're ready!"
             }
         }
 
-        /// The card goes where it won't hide what the step is about: at the top while the ✓
-        /// button and score matter, at the bottom while the grid and power-ups do.
-        var cardAtTop: Bool {
-            self == .commit || self == .scored
+        /// The step that follows a move on the grid, for the steps that wait for one.
+        var nextAfterMove: Step? {
+            switch self {
+            case .tap: return .flipOne
+            case .flipOne: return .unlock
+            case .unlock: return .commit
+            default: return nil
+            }
         }
     }
 
     private(set) var step: Step = .goal
     private(set) var scene: GameScene?
+    /// Where the instruction card goes: between the power-ups and the grid.
+    private(set) var cardFrame: CGRect = .zero
+    /// The step's power-up has been tapped and is waiting for its square.
+    private var armed = false
     private(set) var mood: GameMood = .playing
     private(set) var backgroundShuffle = 0
     /// The practice round's score breakdown, while its card is showing.
@@ -197,8 +224,22 @@ final class TutorialController: GameSceneDelegate {
     private(set) var hint: String?
     private(set) var result: RoundResult?
 
-    /// One tap here clears row 1: the path then scores 5 - 3 leftover whites - 1 locked = 1 point.
+    /// One tap here clears row 1 (with 3 white squares left cut off at the bottom).
     private static let target = GridPoint(row: 0, col: 1)
+    /// Flipping this black square on its own joins the bottom row's whites to the path, so no
+    /// white squares are left over. Unlocking `target` afterwards leaves nothing locked either.
+    private static let flipTarget = GridPoint(row: 3, col: 1)
+
+    /// What the scene lets the player tap during a step.
+    private func gate(for step: Step) -> GameScene.TutorialGate {
+        switch step {
+        case .tap: return .square(Self.target)
+        case .flipOne: return armed ? .square(Self.flipTarget) : .powerup(.flipOne)
+        case .unlock: return armed ? .square(Self.target) : .powerup(.unlock)
+        case .commit: return .commitButton
+        case .goal, .scored, .powerups, .ready: return .nothing
+        }
+    }
 
     private static func makeBoard() -> Board {
         let rows = ["WBWB", "BBBW", "BWBB", "WBWW"]
@@ -213,36 +254,41 @@ final class TutorialController: GameSceneDelegate {
         newScene.gameDelegate = self
         newScene.onTutorialEvent = { [weak self] event in self?.handle(event) }
         scene = newScene
+        cardFrame = newScene.tutorialCardFrame
     }
 
     func advance(to next: Step) {
         SoundEngine.shared.play(.button)
+        move(to: next)
+    }
+
+    private func move(to next: Step) {
         hint = nil
+        armed = false
         step = next
-        switch next {
-        case .tap:
-            scene?.tutorialGate = .square(Self.target)
-        case .commit:
-            scene?.tutorialGate = .commitButton
-        case .goal, .scored, .powerups, .ready:
-            scene?.tutorialGate = .nothing
-        }
+        scene?.tutorialGate = gate(for: next)
     }
 
     private func handle(_ event: GameScene.TutorialEvent) {
         switch event {
+        case .armed:
+            hint = nil
+            armed = true
+            scene?.tutorialGate = gate(for: step)
         case .tapped:
             hint = nil
             scene?.tutorialGate = .nothing
+            let current = step
+            guard let next = current.nextAfterMove else { return }
             // Let the flips play out before moving on.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
-                guard let self = self, self.step == .tap else { return }
-                self.step = .commit
-                self.scene?.tutorialGate = .commitButton
+                guard let self = self, self.step == current else { return }
+                self.move(to: next)
             }
         case .blocked:
             switch step {
             case .tap: hint = "Tap the highlighted square."
+            case .flipOne, .unlock: hint = armed ? "Now tap the highlighted square." : "Tap the highlighted power-up."
             case .commit: hint = "Now tap the ✓ button."
             default: break
             }

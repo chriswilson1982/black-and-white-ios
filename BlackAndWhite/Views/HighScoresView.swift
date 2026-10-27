@@ -54,6 +54,8 @@ struct HighScoresView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    // Taller segments, for more room around the larger labels.
+                    .controlSize(.large)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets())
                 }
@@ -152,14 +154,12 @@ struct HighScoresView: View {
 
     private var personalBestFooter: String {
         guard gameCenterAvailable else {
-            return "Your best on any of your devices. Sign in to Game Center in the Settings app "
-                + "to see your worldwide rank."
+            return "Your best on any of your devices. Sign in to Game Center in the Settings app to see your worldwide rank."
         }
         if case .failed = standing {
-            return "Your best on any of your devices. Couldn't reach Game Center for your worldwide rank; "
-                + "try again later."
+            return "Your best score on any of your devices. Could not reach Game Center for your worldwide rank; try again later."
         }
-        return "Your best on any of your devices."
+        return "Your best score on any of your devices."
     }
 
     /// A tile with one of Game Center's own symbols (tinted) above its title.

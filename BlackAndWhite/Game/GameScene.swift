@@ -76,13 +76,16 @@ final class GameScene: SKScene {
     enum TutorialGate: Equatable {
         case nothing
         case square(GridPoint)
+        case powerup(PowerupNode.Kind)
         case commitButton
     }
 
     /// Things the tutorial reacts to.
     enum TutorialEvent {
-        /// The allowed square was tapped.
+        /// The allowed square was tapped (a normal move, or an armed power-up used on it).
         case tapped
+        /// The allowed power-up was tapped, and is waiting for a square.
+        case armed
         /// A tap the tutorial doesn't allow yet.
         case blocked
         /// The path was tested and the round won.
@@ -378,6 +381,10 @@ final class GameScene: SKScene {
     // MARK: Building the screen
 
     private func computeLayout() {
+        layout = makeLayout()
+    }
+
+    private func makeLayout() -> Layout {
         let w = size.width
         let h = size.height
         let top = h - max(safeInsets.top, 12)
@@ -395,7 +402,27 @@ final class GameScene: SKScene {
         let gridTop = l.powerupY - 0.75 * s
         let gridBottom = l.messageY + 0.6 * s
         l.gridCenter = CGPoint(x: w / 2, y: (gridTop + gridBottom) / 2)
-        layout = l
+        if let tutorialBoard = tutorialBoard {
+            // The small practice grid sits low, just above the message, leaving the space
+            // under the power-ups free for the tutorial's instruction card.
+            let gridHeight = CGFloat(tutorialBoard.rows) * s
+            l.gridCenter.y = gridBottom + 0.3 * s + gridHeight / 2
+        }
+        return l
+    }
+
+    /// Where the tutorial's instruction card can go without covering the grid or any controls:
+    /// between the power-ups and the top of the grid, in SwiftUI's top-down coordinates.
+    var tutorialCardFrame: CGRect {
+        guard let tutorialBoard = tutorialBoard, size.width > 0 else { return .zero }
+        let l = makeLayout()
+        let gap = 0.35 * l.s
+        // The power-ups are 0.95 squares tall; the grid's border reaches 13 points past the grid.
+        let top = l.powerupY - 0.475 * l.s - gap
+        let bottom = l.gridCenter.y + CGFloat(tutorialBoard.rows) * l.s / 2 + 13 + gap
+        let width = min(size.width - 32, 560)
+        return CGRect(x: (size.width - width) / 2, y: size.height - top,
+                      width: width, height: max(top - bottom, 0))
     }
 
     /// Creates everything except the grid itself. Called at launch and whenever the colours change.
@@ -586,7 +613,8 @@ final class GameScene: SKScene {
         } else {
             level = 1
             score = 0
-            powerupCounts = Array(repeating: settings.difficulty.startingPowerups, count: 3)
+            // The tutorial always has some to practise with (Hard starts with none).
+            powerupCounts = Array(repeating: isTutorial ? 3 : settings.difficulty.startingPowerups, count: 3)
             punishNext = false
             usedPowerupsThisGame = false
         }
@@ -632,7 +660,7 @@ final class GameScene: SKScene {
         applyChromeForPhase()
     }
 
-    private var levelText: String { "Level \(level)" }
+    private var levelText: String { isTutorial ? "Practice" : "Level \(level)" }
 
     /// Lays out the grid for the current board. When animated, old squares scatter
     /// into the background and new ones fly in from it.
@@ -807,6 +835,9 @@ final class GameScene: SKScene {
             switch tutorialGate {
             case .commitButton where hit(commitButton, size: commitSize, p):
                 commitTapped()
+            case .powerup(let kind) where phase == .playing && powerupNodes[kind.rawValue].contains(scenePoint: p):
+                powerupTapped(kind)
+                onTutorialEvent?(.armed)
             case .square(let target) where phase == .playing && cell(at: p) == target:
                 trackingGrid = true
                 pressedCell = target
@@ -995,6 +1026,7 @@ final class GameScene: SKScene {
                 refreshStar()
                 refreshCounters()
                 tapHaptic.impactOccurred()
+                onTutorialEvent?(.tapped)
                 return
             }
             // Tapping an unlocked square cancels the power-up and plays a normal move.
@@ -1018,6 +1050,7 @@ final class GameScene: SKScene {
             refreshStar()
             refreshCounters()
             tapHaptic.impactOccurred()
+            onTutorialEvent?(.tapped)
             return
         case .normal:
             break
@@ -1145,19 +1178,32 @@ final class GameScene: SKScene {
         refreshPowerups()
     }
 
-    /// The tutorial's pulsing outline on the square it wants tapped.
+    /// The tutorial's pulsing outline on the square or power-up it wants tapped.
     private func refreshTutorialHighlight() {
         tutorialMarker?.removeFromParent()
         tutorialMarker = nil
-        guard isBuilt, case .square(let p) = tutorialGate else { return }
+        guard isBuilt else { return }
         let s = layout.s
-        // Just outside the square, so it frames it rather than covering it.
-        let marker = SKShapeNode(rectOf: CGSize(width: s + 8, height: s + 8), cornerRadius: s * 0.22)
+        let marker: SKShapeNode
+        switch tutorialGate {
+        case .square(let p):
+            // Just outside the square, so it frames it rather than covering it.
+            marker = SKShapeNode(rectOf: CGSize(width: s + 8, height: s + 8), cornerRadius: s * 0.22)
+            marker.position = cellPosition(p)
+            marker.zPosition = Z.preview
+        case .powerup(let kind):
+            // Outside the button and its "full" ring.
+            let node = powerupNodes[kind.rawValue]
+            marker = SKShapeNode(rectOf: CGSize(width: node.size.width + 14, height: node.size.height + 14),
+                                 cornerRadius: node.size.height * 0.32 + 7)
+            marker.position = node.position
+            marker.zPosition = Z.controls - 0.1
+        case .nothing, .commitButton:
+            return
+        }
         marker.strokeColor = pathColor
         marker.lineWidth = 4
         marker.fillColor = .clear
-        marker.position = cellPosition(p)
-        marker.zPosition = Z.preview
         addChild(marker)
         tutorialMarker = marker
         if !Motion.reduced {

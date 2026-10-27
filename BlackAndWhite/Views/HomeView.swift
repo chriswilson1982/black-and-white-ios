@@ -90,7 +90,8 @@ struct HomeView: View {
                 Image(systemName: symbol)
                     .font(.title2.weight(.semibold))
                     .foregroundStyle(.black)
-                    .frame(width: 60, height: 52)
+                    // Square, like the power-up buttons.
+                    .frame(width: 60, height: 60)
                     .background(RoundedRectangle(cornerRadius: 16).fill(.white.opacity(0.85)))
                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(.black, lineWidth: 2.5))
                 Text(title)
