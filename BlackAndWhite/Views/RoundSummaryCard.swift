@@ -39,7 +39,7 @@ struct RoundSummaryCard: View {
         }
         add(.color(pathColor), "Path squares", "+\(summary.pathCount)")
         if summary.noWhitesBonus > 0 {
-            add(.color(.white), "No whites left", "+\(summary.noWhitesBonus)")
+            add(.symbol("square.slash.fill"), "No whites left", "+\(summary.noWhitesBonus)")
         } else if summary.leftoverWhites > 0 {
             add(.color(.white), "White squares left", "−\(summary.leftoverWhites)")
         }
@@ -52,7 +52,7 @@ struct RoundSummaryCard: View {
         case nil: break
         }
         if summary.powerupReward {
-            add(.symbol("plus.square.fill"), "Power-up reward", "+1 each",
+            add(.symbol("plus.square"), "Power-up reward", "+1 each",
                 detail: "Score ≥ grid size (\(summary.gridSize))")
         }
         return rows

@@ -12,12 +12,15 @@ struct HelpView: View {
                 }
 
                 section("Scoring") {
-                    Text("+1 for each white square in the path, −1 for each white square left over and each locked square. Score zero or less and the next grid is a tricky 4×4 grid.")
+                    Text("**+1** for each white square now in the path.")
+                    Text("**−1** for each locked square.")
+                    Text("**−1** for each white square left over.")
+                    Text("Score zero or less and the next level will be on a tricky 4×4 grid.")
                 }
 
                 section("Bonuses") {
-                    row("square.fill", "**No whites left:** Leave no white squares outside the path for bonus points equal to the grid's rows plus columns. For example, both a 5x5 and 4x6 grid will give a bonus of 10 points.")
-                    row("plus.square.fill", "**Power-up reward:** If your score for a level is at least equal to the number of squares in the grid, you also get one of each power-up.")
+                    row("square.slash.fill", "**No whites left:** Leave no white squares outside the path for bonus points equal to the grid's rows plus columns. For example, both a 5x5 and 4x6 grid will give a bonus of 10 points.")
+                    row("plus.square", "**Power-up reward:** If your score for a level is at least equal to the number of squares in the grid, you also get one of each power-up.")
                     row("star.fill", "**Star:** Catch the star in your path for an extra power-up. If your power-ups are all full, you get points equal to the level number instead; use this to get high scores later in the game!")
                 }
 
@@ -47,9 +50,15 @@ struct HelpView: View {
     /// A line with an icon. `text` may use **bold** Markdown.
     private func row(_ symbol: String, _ text: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 16) {
-            Image(systemName: symbol)
-                .frame(width: 32)
-                .accessibilityHidden(true)
+            VStack {
+                
+                Spacer()
+                Image(systemName: symbol)
+                    .imageScale(.large)
+                    .frame(width: 32)
+                    .accessibilityHidden(true)
+                Spacer()
+            }
             Text(LocalizedStringKey(text))
         }
     }

@@ -336,8 +336,34 @@ final class GameScene: SKScene {
         removeAction(forKey: "summary")
         endGridTracking()
         awaitingStart = true
-        if !hasDealtRound { setBarsHidden(true) }
+        clearBoard()
         gameDelegate?.gameSceneWantsStart(self)
+    }
+
+    /// Sends the old grid off into the background while the start card is up, so the new game
+    /// deals in onto an empty screen.
+    private func clearBoard() {
+        if mode != .normal { setMode(.normal) }
+        for node in squares.values {
+            scatter(node, delay: 0, duration: 0.6)
+        }
+        squares = [:]
+        for node in gridDecor {
+            node.run(.sequence([.fadeOut(withDuration: 0.3), .removeFromParent()]))
+        }
+        gridDecor = []
+        if let star = starNode {
+            starNode = nil
+            star.run(.sequence([.group([.scale(to: 0.3, duration: 0.6), .fadeOut(withDuration: 0.6)]),
+                                .removeFromParent()]))
+        }
+        for counter in [blackCounter, whiteCounter] {
+            counter?.removeAllActions()
+            counter?.run(.fadeOut(withDuration: 0.3))
+        }
+        setBarsHidden(true)
+        // Nothing to redraw on a size change until the new grid is dealt.
+        hasDealtRound = false
     }
 
     /// The player tapped Start: deal the first level.
