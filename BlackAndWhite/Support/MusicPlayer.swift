@@ -63,6 +63,8 @@ final class MusicPlayer {
     private var isConfigured = false
     /// Paused for the background or for another app's audio; resumed when that's over.
     private var pausedForBackground = false
+    /// The audio output changed while in the background, so the music needs starting afresh.
+    private var restartOnResume = false
     private var silencedByOtherAudio = false
 
     private init() {}
@@ -172,6 +174,15 @@ final class MusicPlayer {
     func resumeFromBackground() {
         guard pausedForBackground else { return }
         pausedForBackground = false
+        if restartOnResume {
+            // The audio output changed while away, which cleared the queue: from the intro again.
+            restartOnResume = false
+            if state == .playing {
+                state = .stopped
+                start()
+            }
+            return
+        }
         guard state != .stopped, startEngine() else { return }
         if state == .playing { loopPlayer.play() } else { outroPlayer.play() }
     }
@@ -297,11 +308,22 @@ final class MusicPlayer {
     /// The audio route changed (headphones, for example), which stops the engine and its queue:
     /// start the track again.
     private func configurationChanged() {
-        guard state == .playing, !pausedForBackground else {
-            if state == .outro { stop(fade: false) }
+        // Rewire for the new output's sample rate and channels, as the old wiring may not suit it.
+        engine.stop()
+        engine.connect(engine.mainMixerNode, to: engine.outputNode, format: nil)
+        engine.prepare()
+        switch state {
+        case .stopped:
             return
+        case .outro:
+            // Just a fading tail: let it go.
+            stop(fade: false)
+        case .playing where pausedForBackground:
+            // The queued music is gone; start afresh once the app is back.
+            restartOnResume = true
+        case .playing:
+            state = .stopped
+            start()
         }
-        state = .stopped
-        start()
     }
 }

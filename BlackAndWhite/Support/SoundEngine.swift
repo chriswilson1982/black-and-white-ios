@@ -123,6 +123,17 @@ final class SoundEngine {
         player.play()
     }
 
+    /// Rewires the engine for the current audio output and starts it again. Called when the
+    /// output changes or an interruption ends; also the next `play` retries if starting fails.
+    private func restartEngine() {
+        engine.stop()
+        for player in players { player.stop() }
+        // Connecting with no format picks up the new output's sample rate and channels.
+        engine.connect(engine.mainMixerNode, to: engine.outputNode, format: nil)
+        engine.prepare()
+        try? engine.start()
+    }
+
     private static var sessionConfigured = false
 
     /// Sets up the app's audio session, once (shared with the music player).
@@ -155,6 +166,20 @@ final class SoundEngine {
             players.append(player)
         }
         engine.mainMixerNode.outputVolume = 0.35
+
+        // When the audio output changes (Bluetooth connecting or disconnecting, headphones),
+        // the system stops the engine or leaves it wired for the old output; and a phone call or
+        // Siri interrupts it. Either way, get it going again so the effects aren't left silent.
+        let center = NotificationCenter.default
+        center.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine,
+                           queue: .main) { [weak self] _ in self?.restartEngine() }
+        center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil,
+                           queue: .main) { [weak self] note in
+            guard let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  AVAudioSession.InterruptionType(rawValue: raw) == .ended else { return }
+            self?.restartEngine()
+        }
+
         for effect in SoundEffect.allCases {
             buffers[effect] = render(effect.notes)
         }
