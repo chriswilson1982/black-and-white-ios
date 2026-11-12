@@ -12,8 +12,13 @@ struct BlackAndWhiteApp: App {
             ContentView()
                 // The rounded system font everywhere, to match the rounded squares.
                 .fontDesign(.rounded)
+                // On iPad, windows can't be made too small to play in.
+                .frame(minWidth: Self.isPad ? 360 : nil, minHeight: Self.isPad ? 560 : nil)
         }
+        .windowResizability(.contentMinSize)
     }
+
+    private static let isPad = UIDevice.current.userInterfaceIdiom == .pad
 
     /// Segmented pickers (the difficulty pickers) are drawn by UIKit, which ignores SwiftUI's
     /// `.font` and `.fontDesign`, so their larger, rounded text is set here instead.

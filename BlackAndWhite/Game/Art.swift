@@ -132,12 +132,21 @@ enum Art {
         case bottom = 1, right = 2
     }
 
+    /// How far a fillet texture carries on past its two straight edges (bottom and right), in points.
+    /// The extra strip lies over the squares beside the corner, which are the same colour, and
+    /// covers the seam along the grid lines, where both edges would otherwise be only partly drawn
+    /// and let the square underneath show through as a faint line (most visible on 2x screens).
+    /// The texture is `side + filletBleed` across; see `SquareNode` for how it's placed.
+    static let filletBleed: CGFloat = 1
+
     /// Half of `fillet(side:)`, for a connector between two squares of different colours,
     /// so each colour reaches exactly halfway.
     static func fillet(side: CGFloat, half: FilletHalf?) -> SKTexture {
         let key = sizeKey(side) * 4 + (half?.rawValue ?? 0)
         if let cached = fillCache[key] { return cached }
         let rect = CGRect(x: 0, y: 0, width: side, height: side)
+        let b = filletBleed
+        let canvas = CGSize(width: side + b, height: side + b)
         // The rounded corner is a quarter circle centred on the top-left corner. This arc runs
         // through the same two end points but has its centre pushed out along the diagonal
         // (to -d, -d) and a larger radius, so it sits a little further from the bottom-right
@@ -147,33 +156,36 @@ enum Art {
         let d = (side * side - 2 * mid * mid) / (4 * mid - 2 * side)
         let radius = 2.squareRoot() * (mid + d)
         let centre = CGPoint(x: -d, y: -d)
-        let image = renderer(size: rect.size).image { _ in
+        let image = renderer(size: canvas).image { _ in
             UIColor.white.setFill()
             if let half = half {
                 // Keep one side of the diagonal from the top-left to the corner point (bottom-right),
                 // plus half a point past it, so the two halves overlap slightly and leave no seam.
+                // Each half keeps the bleed strip along its own edge.
                 let e: CGFloat = 0.5
                 let clip = UIBezierPath()
                 switch half {
                 case .bottom:
                     clip.move(to: .zero)
                     clip.addLine(to: CGPoint(x: e, y: 0))
-                    clip.addLine(to: CGPoint(x: side, y: side - e))
-                    clip.addLine(to: CGPoint(x: side, y: side))
-                    clip.addLine(to: CGPoint(x: 0, y: side))
+                    clip.addLine(to: CGPoint(x: side + b, y: side + b - e))
+                    clip.addLine(to: CGPoint(x: side + b, y: side + b))
+                    clip.addLine(to: CGPoint(x: 0, y: side + b))
                 case .right:
                     clip.move(to: .zero)
-                    clip.addLine(to: CGPoint(x: side, y: 0))
-                    clip.addLine(to: CGPoint(x: side, y: side))
-                    clip.addLine(to: CGPoint(x: side - e, y: side))
+                    clip.addLine(to: CGPoint(x: side + b, y: 0))
+                    clip.addLine(to: CGPoint(x: side + b, y: side + b))
+                    clip.addLine(to: CGPoint(x: side + b - e, y: side + b))
                     clip.addLine(to: CGPoint(x: 0, y: e))
                 }
                 clip.close()
                 clip.addClip()
             }
+            // The curve is unchanged; only the straight edges reach `b` further.
             let path = UIBezierPath()
-            path.move(to: CGPoint(x: rect.maxX, y: 0))
-            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            path.move(to: CGPoint(x: rect.maxX + b, y: 0))
+            path.addLine(to: CGPoint(x: rect.maxX + b, y: rect.maxY + b))
+            path.addLine(to: CGPoint(x: 0, y: rect.maxY + b))
             path.addLine(to: CGPoint(x: 0, y: rect.maxY))
             // From (0, side) round to (side, 0).
             path.addArc(withCenter: centre, radius: radius,

@@ -1,5 +1,6 @@
 import Foundation
 import GameKit
+import OSLog
 
 /// The game's Game Center achievements. Each needs a matching entry in App Store Connect
 /// with the same ID (see the README for the full list with points and descriptions).
@@ -51,6 +52,10 @@ final class AchievementTracker {
 
     private var earned: Set<String>
     private var starsCollected: Int
+
+    #if DEBUG
+    private static let log = Logger(subsystem: "com.chriswilson.blackandwhite", category: "Achievements")
+    #endif
 
     private init() {
         var saved = Set(defaults.stringArray(forKey: earnedKey) ?? [])
@@ -175,8 +180,9 @@ final class AchievementTracker {
     private func report(_ entries: [GKAchievement]) {
         guard GKLocalPlayer.local.isAuthenticated, !entries.isEmpty else { return }
         #if DEBUG
+        // The system log timestamps each line as it happens (print output can arrive in a batch).
         let summary = entries.map { "\($0.identifier.split(separator: ".").last ?? "") \(Int($0.percentComplete))%" }
-        print("Reporting achievements: \(summary.joined(separator: ", "))")
+        Self.log.info("Reporting achievements: \(summary.joined(separator: ", "), privacy: .public)")
         #endif
         GKAchievement.report(entries) { error in
             if let error = error {

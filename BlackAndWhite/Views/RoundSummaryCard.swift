@@ -343,7 +343,13 @@ private struct SummaryCardContainer<Content: View>: View {
     let onDismiss: () -> Void
     @ViewBuilder let content: Content
 
-    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 26, style: .continuous) }
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
+    /// A big window (an iPad, more or less full screen), where the card and its text grow.
+    private var isLarge: Bool { horizontalSizeClass == .regular && verticalSizeClass == .regular }
+
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: isLarge ? 32 : 26, style: .continuous) }
 
     var body: some View {
         let textColor = Color(uiColor: settings.textColor)
@@ -355,8 +361,10 @@ private struct SummaryCardContainer<Content: View>: View {
                 .accessibilityHidden(true)
             content
                 .foregroundStyle(textColor)
-                .padding(22)
-                .frame(maxWidth: 320)
+                // Larger text on a big screen, or the player's own size if that's larger still.
+                .dynamicTypeSize(isLarge ? .xxxLarge ... .accessibility5 : .xSmall ... .accessibility5)
+                .padding(isLarge ? 30 : 22)
+                .frame(maxWidth: isLarge ? 420 : 320)
                 // Frosted, with a tint of the theme's background: the board shows through softly
                 // while the text stays easy to read.
                 .background {

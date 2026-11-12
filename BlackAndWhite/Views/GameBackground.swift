@@ -49,16 +49,9 @@ struct GameBackground: View {
         .onDisappear { tilt.stop() }
     }
 
-    @ViewBuilder
     private func gradient(at date: Date) -> some View {
-        let colors = colors(at: date).map { Color(uiColor: $0) }
-        if #available(iOS 18.0, *) {
-            MeshGradient(width: 3, height: 3, points: points(at: date), colors: colors)
-        } else {
-            // Mesh gradients need iOS 18; a diagonal blend of the same colours stands in.
-            LinearGradient(colors: [colors[0], colors[4], colors[8]],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
-        }
+        MeshGradient(width: 3, height: 3, points: points(at: date),
+                     colors: colors(at: date).map { Color(uiColor: $0) })
     }
 
     // MARK: Colours

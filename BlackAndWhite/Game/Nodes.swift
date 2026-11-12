@@ -147,8 +147,14 @@ final class SquareNode: SKSpriteNode {
                 let rotation = atan2(CGFloat(-fill.dy), CGFloat(-fill.dx)) + .pi / 4
                 // Children tint with the parent's colour and share its alpha, so the piece always
                 // matches this square exactly, even mid-flip.
+                // The texture reaches `bleed` past its straight edges (see `Art.filletBleed`).
+                // Anchoring on the centre of the curved r × r piece places and turns it as before.
+                let bleed = Art.filletBleed
                 let node = SKSpriteNode(texture: Self.fillTexture(fill.half, side: r, rotation: rotation),
-                                        color: .white, size: CGSize(width: r, height: r))
+                                        color: .white, size: CGSize(width: r + bleed, height: r + bleed))
+                // In SpriteKit's bottom-up units: the piece's centre is r/2 from the left and
+                // r/2 + bleed from the bottom (the bleed strip runs along the bottom and right).
+                node.anchorPoint = CGPoint(x: (r / 2) / (r + bleed), y: (r / 2 + bleed) / (r + bleed))
                 node.position = CGPoint(x: point.x + CGFloat(fill.dx) * r / 2, y: point.y + CGFloat(fill.dy) * r / 2)
                 node.zRotation = rotation
                 // Slightly above the squares, so it overlaps the rounded edge it fills and no seam shows.

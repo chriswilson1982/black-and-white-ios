@@ -4,7 +4,7 @@ A grid puzzle game for iPhone and iPad: clear a path of white squares across the
 
 ## Running it
 
-1. Open `BlackAndWhite.xcodeproj` in an Xcode with the **iOS 27 SDK**. The app still runs on **iOS 17 and later**.
+1. Open `BlackAndWhite.xcodeproj` in an Xcode with the **iOS 27 SDK**. The app still runs on **iOS 18 and later**.
 2. Select the **BlackAndWhite** target → *Signing & Capabilities* and choose your team. The bundle identifier is `com.chriswilson.newblackandwhite`; change it if you're building under your own account.
 3. Pick an iPhone or iPad and press **Run**. The game runs in portrait.
 
@@ -115,7 +115,7 @@ Your best score at each difficulty, and when you set it, is kept in iCloud key-v
 | `Support/SoundEngine.swift` | Retro sound effects synthesised at launch |
 | `Views/ContentView.swift`, `GameCoordinator.swift` | App screen and the glue between the game and SwiftUI |
 | `Views/HomeView.swift` | Home screen and the How to Play sheet |
-| `Views/GameBackground.swift` | Mesh gradient background (with a fallback gradient on iOS 17) |
+| `Views/GameBackground.swift` | Mesh gradient background |
 | `Views/TutorialView.swift` | The guided tutorial |
 | `Views/SettingsView.swift`, `HighScoresView.swift`, `HelpView.swift` | Settings, high scores and help |
 

@@ -13,7 +13,13 @@ struct HomeView: View {
     let onHelp: () -> Void
     let onTutorial: () -> Void
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
     private var textColor: Color { Color(uiColor: settings.textColor) }
+
+    /// Everything grows by this much in a big window (an iPad, more or less full screen).
+    private var k: CGFloat { horizontalSizeClass == .regular && verticalSizeClass == .regular ? 1.4 : 1 }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -27,16 +33,16 @@ struct HomeView: View {
                         .tracking(1)
                         .opacity(0.7)
                     Text("\(best.score)")
-                        .font(.system(size: 44, weight: .bold).monospacedDigit())
+                        .font(.system(size: 44 * k, weight: .bold).monospacedDigit())
                         .foregroundStyle(settings.pathColor.color)
                 }
-                .padding(.top, 28)
+                .padding(.top, 28 * k)
                 .accessibilityElement(children: .combine)
             }
             Spacer()
             playButton
-            Spacer().frame(height: 36)
-            HStack(spacing: 14) {
+            Spacer().frame(height: 36 * k)
+            HStack(spacing: 14 * k) {
                 menuButton("trophy.fill", "Scores", action: onHighScores)
                 menuButton("gearshape.fill", "Settings", action: onSettings)
                 menuButton("questionmark", "How to Play", action: onHelp)
@@ -45,8 +51,10 @@ struct HomeView: View {
             Spacer()
         }
         .padding(24)
-        .frame(maxWidth: 520)
+        .frame(maxWidth: 520 * k)
         .foregroundStyle(textColor)
+        // Larger text styles on a big screen, or the player's own size if that's larger still.
+        .dynamicTypeSize(k > 1 ? .xxxLarge ... .accessibility5 : .xSmall ... .accessibility5)
     }
 
     /// "black & white", as in the game's title.
@@ -56,7 +64,7 @@ struct HomeView: View {
             Text("&").fontWeight(.bold)
             Text("white").fontWeight(.light)
         }
-        .font(.system(size: 56))
+        .font(.system(size: 56 * k))
         .minimumScaleFactor(0.5)
         .lineLimit(1)
         .accessibilityElement(children: .combine)
@@ -72,28 +80,26 @@ struct HomeView: View {
                 Capsule()
                     .fill(settings.pathColor.color)
                     .overlay(Capsule().stroke(.white, lineWidth: 2))
-                    .padding(6)
+                    .padding(6 * k)
                 Label("Play", systemImage: "play.fill")
                     .labelStyle(.titleAndIcon)
                     .font(.title.bold())
                     .foregroundStyle(textColor)
             }
-            .frame(width: 220, height: 76)
+            .frame(width: 220 * k, height: 76 * k)
         }
         .buttonStyle(.plain)
     }
 
-    /// Chunky rounded buttons like the power-ups, with a caption underneath.
+    /// Glass squircles, with a caption underneath.
     private func menuButton(_ symbol: String, _ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            VStack(spacing: 6 * k) {
                 Image(systemName: symbol)
                     .font(.title2.weight(.semibold))
-                    .foregroundStyle(.black)
                     // Square, like the power-up buttons.
-                    .frame(width: 60, height: 60)
-                    .background(RoundedRectangle(cornerRadius: 16).fill(.white.opacity(0.85)))
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(.black, lineWidth: 2.5))
+                    .frame(width: 60 * k, height: 60 * k)
+                    .menuGlass(in: RoundedRectangle(cornerRadius: 18 * k, style: .continuous))
                 Text(title)
                     .font(.caption.weight(.semibold))
                     .lineLimit(1)
@@ -102,6 +108,19 @@ struct HomeView: View {
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
+    }
+}
+
+private extension View {
+    /// Liquid Glass that responds to touch, on iOS 26 and later; frosted material before that.
+    @ViewBuilder
+    func menuGlass(in shape: some Shape) -> some View {
+        if #available(iOS 26, *) {
+            glassEffect(.regular.interactive(), in: shape)
+        } else {
+            background(.ultraThinMaterial, in: shape)
+                .overlay(shape.stroke(.white.opacity(0.35), lineWidth: 1))
+        }
     }
 }
 

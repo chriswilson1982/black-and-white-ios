@@ -90,6 +90,8 @@ final class GameScene: SKScene {
         case blocked
         /// The path was tested and the round won.
         case won(RoundResult)
+        /// The screen was laid out again (for a new size), so `tutorialCardFrame` has changed.
+        case layoutChanged
     }
 
     enum Phase {
@@ -230,6 +232,9 @@ final class GameScene: SKScene {
     private var gridDecor: [SKNode] = []
     private var crosses: [SKNode] = []
     private var starNode: SKSpriteNode?
+    /// The squares the black and white counters sit on, kept until that square changes colour.
+    private var blackCounterCell: GridPoint?
+    private var whiteCounterCell: GridPoint?
     /// What the star brought this round, once the wave has reached it.
     private var collectedStar: RoundSummary.Star?
 
@@ -571,9 +576,14 @@ final class GameScene: SKScene {
         addChild(finishBar)
 
         // Rounded to roughly follow the screen's own corners. iOS doesn't publish the exact radius;
-        // about 55 points suits current iPhones, and phones without a home indicator (and so with
-        // square screen corners) get square corners.
-        let screenCornerRadius: CGFloat = safeInsets.bottom > 0 ? 55 : 0
+        // about 55 points suits current iPhones and about 18 current iPads (and their windows).
+        // Phones without a home indicator (and so with square screen corners) get square corners.
+        let screenCornerRadius: CGFloat
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            screenCornerRadius = 18
+        } else {
+            screenCornerRadius = safeInsets.bottom > 0 ? 55 : 0
+        }
         urgencyFrame = SKShapeNode(rect: CGRect(origin: .zero, size: size), cornerRadius: screenCornerRadius)
         urgencyFrame.strokeColor = lockColor
         urgencyFrame.fillColor = .clear
@@ -585,6 +595,8 @@ final class GameScene: SKScene {
         isBuilt = true
         refreshPowerups()
         applyChromeForPhase()
+        // The tutorial's card follows the layout when the window changes size.
+        if isTutorial { onTutorialEvent?(.layoutChanged) }
     }
 
     /// Rebuilds the screen after a size change, keeping the current round.
@@ -651,6 +663,9 @@ final class GameScene: SKScene {
         isTrickyGrid = punished
 
         board = tutorialBoard ?? Board.randomSolvable(punishment: punished)
+        // A new grid: the counters pick new squares.
+        blackCounterCell = nil
+        whiteCounterCell = nil
         phase = .dealing
         mode = .normal
         resultPath = []
@@ -791,11 +806,13 @@ final class GameScene: SKScene {
         let startY = cellPosition(board.startPoint).y
         let finishY = cellPosition(board.finishPoint).y
 
+        // The outlines end in the middle of the grid's frame (10 points out, 6 wide), so they
+        // meet it at any square size.
         let moves: [(SKNode, CGPoint)] = [
             (startBar, CGPoint(x: gridLeft, y: startY)),
-            (startBackdrop, CGPoint(x: gridLeft - 0.25 * s, y: startY)),
+            (startBackdrop, CGPoint(x: gridLeft - 10, y: startY)),
             (finishBar, CGPoint(x: gridRight, y: finishY)),
-            (finishBackdrop, CGPoint(x: gridRight + 0.25 * s, y: finishY)),
+            (finishBackdrop, CGPoint(x: gridRight + 10, y: finishY)),
         ]
         for (node, target) in moves {
             node.removeAllActions()
@@ -1795,8 +1812,18 @@ final class GameScene: SKScene {
         let whites = board.cells(of: .white).filter { !resultPath.contains($0) }
         blackCounter.text = "\(blacks.count)"
         whiteCounter.text = "\(whites.count)"
-        place(blackCounter, on: blacks.filter { $0 != board.star }.randomElement())
-        place(whiteCounter, on: whites.filter { $0 != board.star }.randomElement())
+        blackCounterCell = counterCell(keeping: blackCounterCell, from: blacks)
+        whiteCounterCell = counterCell(keeping: whiteCounterCell, from: whites)
+        place(blackCounter, on: blackCounterCell)
+        place(whiteCounter, on: whiteCounterCell)
+    }
+
+    /// The square a counter sits on: the same one as before while it's still that colour,
+    /// otherwise a new one picked at random.
+    private func counterCell(keeping current: GridPoint?, from cells: [GridPoint]) -> GridPoint? {
+        let options = cells.filter { $0 != board.star }
+        if let current = current, options.contains(current) { return current }
+        return options.randomElement()
     }
 
     private func place(_ label: SKLabelNode, on p: GridPoint?) {

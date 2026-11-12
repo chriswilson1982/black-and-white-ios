@@ -68,6 +68,16 @@ struct SettingsView: View {
                     Text("Pick a colour scheme, then fine-tune any colour if you like.")
                 }
 
+                if UIApplication.shared.supportsAlternateIcons {
+                    Section {
+                        AppIconPicker()
+                    } header: {
+                        Text("App Icon")
+                    } footer: {
+                        Text("Changes the icon on your Home Screen straight away.")
+                    }
+                }
+
                 Section {
                     Toggle("Sound effects", isOn: $draft.soundEnabled)
                 }
@@ -195,6 +205,120 @@ private struct PalettePicker: View {
             .fill(color.color)
             .overlay(Circle().strokeBorder(.secondary.opacity(0.4), lineWidth: 0.5))
             .frame(width: 18, height: 18)
+    }
+}
+
+/// A scrolling row of the app icons, one per colour scheme. Tapping one switches the
+/// Home Screen icon (iOS confirms with its own short alert).
+private struct AppIconPicker: View {
+    /// The alternate icon in use; nil for the main one (Classic).
+    @State private var current: String? = UIApplication.shared.alternateIconName
+
+    /// Each scheme's icon name: the main icon for Classic, otherwise "AppIcon-<scheme>".
+    private func iconName(for palette: ColorPalette) -> String? {
+        palette.name == "Classic" ? nil : "AppIcon-\(palette.name)"
+    }
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(ColorPalette.all) { palette in
+                    let name = iconName(for: palette)
+                    let isSelected = name == current
+                    Button {
+                        choose(name)
+                    } label: {
+                        VStack(spacing: 6) {
+                            AppIconPreview(palette: palette)
+                                .frame(width: 60, height: 60)
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 60 * 0.225, style: .continuous)
+                                        .strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 2.5)
+                                        .padding(-4)
+                                }
+                            Text(palette.name)
+                                .font(.caption)
+                                .foregroundStyle(.primary)
+                        }
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 4)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(palette.name) app icon")
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
+    private func choose(_ name: String?) {
+        guard name != current else { return }
+        Task { @MainActor in
+            do {
+                try await UIApplication.shared.setAlternateIconName(name)
+                current = name
+            } catch {
+                print("Couldn't change the app icon: \(error.localizedDescription)")
+            }
+        }
+    }
+}
+
+/// The app icon's design drawn in a scheme's colours: a 3×3 grid of rounded squares on white,
+/// laid out like AppIcon.icon (path and locked colours, white and black).
+private struct AppIconPreview: View {
+    let palette: ColorPalette
+
+    private enum Tile { case lock, path, white, black }
+
+    /// Top row first, as in the Icon Composer design.
+    private let rows: [[Tile]] = [
+        [.lock, .black, .white],
+        [.path, .path, .lock],
+        [.black, .path, .path],
+    ]
+
+    var body: some View {
+        GeometryReader { proxy in
+            let side = proxy.size.width
+            let gap = side * 0.06
+            let tile = (side * 0.78 - 2 * gap) / 3
+            ZStack {
+                RoundedRectangle(cornerRadius: side * 0.225, style: .continuous)
+                    .fill(.white)
+                    .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+                VStack(spacing: gap) {
+                    ForEach(0..<3, id: \.self) { r in
+                        HStack(spacing: gap) {
+                            ForEach(0..<3, id: \.self) { c in
+                                RoundedRectangle(cornerRadius: tile * 0.25, style: .continuous)
+                                    .fill(color(rows[r][c]))
+                                    .overlay {
+                                        // The white tile needs an edge to show on the white icon.
+                                        if rows[r][c] == .white {
+                                            RoundedRectangle(cornerRadius: tile * 0.25, style: .continuous)
+                                                .strokeBorder(.black.opacity(0.1), lineWidth: 1)
+                                        }
+                                    }
+                                    .frame(width: tile, height: tile)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .accessibilityHidden(true)
+    }
+
+    private func color(_ tile: Tile) -> Color {
+        switch tile {
+        case .lock: return palette.lockColor.color
+        case .path: return palette.pathColor.color
+        case .white: return .white
+        case .black: return .black
+        }
     }
 }
 

@@ -63,6 +63,12 @@ struct TutorialView: View {
                                                       bottom: insets.bottom, right: insets.trailing),
                                  settings: settings)
             }
+            .onChange(of: proxy.safeAreaInsets) { _, insets in
+                // The scene re-lays itself out (and reports the new card frame) when its size
+                // changes; the safe area has to be passed on by hand.
+                tutorial.scene?.safeInsets = UIEdgeInsets(top: insets.top, left: insets.leading,
+                                                          bottom: insets.bottom, right: insets.trailing)
+            }
         }
         .toolbar(.hidden, for: .navigationBar)
         .statusBarHidden()
@@ -86,11 +92,14 @@ struct TutorialView: View {
     /// The instruction card, scrolling if its text doesn't fit the space (on small phones,
     /// or with large text).
     private func card(maxHeight: CGFloat) -> some View {
-        ViewThatFits(in: .vertical) {
-            cardContent
-            ScrollView { cardContent }
+        // As tall as its text, up to the space available (a plain maxHeight frame would stretch
+        // the card to fill all of it).
+        HeightCap(maxHeight: max(maxHeight - 32, 0)) {
+            ViewThatFits(in: .vertical) {
+                cardContent
+                ScrollView { cardContent }
+            }
         }
-        .frame(maxHeight: max(maxHeight - 32, 0))
         .padding(16)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         .id(tutorial.step)
@@ -99,21 +108,14 @@ struct TutorialView: View {
 
     private var cardContent: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                HStack(spacing: 6) {
-                    ForEach(TutorialController.Step.allCases, id: \.rawValue) { s in
-                        Circle()
-                            .fill(.primary.opacity(s.rawValue <= tutorial.step.rawValue ? 1 : 0.2))
-                            .frame(width: 7, height: 7)
-                    }
-                }
-                .accessibilityHidden(true)
-                Spacer()
-                if tutorial.step != .ready {
-                    Button("Skip") { finish() }
-                        .font(.subheadline.weight(.semibold))
+            HStack(spacing: 6) {
+                ForEach(TutorialController.Step.allCases, id: \.rawValue) { s in
+                    Circle()
+                        .fill(.primary.opacity(s.rawValue <= tutorial.step.rawValue ? 1 : 0.2))
+                        .frame(width: 7, height: 7)
                 }
             }
+            .accessibilityHidden(true)
 
             Text(tutorial.step.title)
                 .font(.title3.bold())
@@ -127,12 +129,23 @@ struct TutorialView: View {
                     .transition(.opacity)
             }
 
-            if let next = tutorial.step.nextOnButton {
-                primaryButton("Next") { tutorial.advance(to: next) }
-            } else if tutorial.step == .ready {
-                primaryButton("Play") { finish() }
+            // Bottom right: Leave (ends the whole tutorial), then Next or Play. Steps without
+            // Next wait for a move on the game screen itself.
+            HStack(spacing: 12) {
+                Spacer()
+                if tutorial.step != .ready {
+                    Button("Leave Tutorial") { finish() }
+                        .font(.subheadline.weight(.semibold))
+                        .buttonStyle(.borderless)
+                        .tint(.primary)
+                }
+                if let next = tutorial.step.nextOnButton {
+                    primaryButton("Next") { tutorial.advance(to: next) }
+                } else if tutorial.step == .ready {
+                    primaryButton("Play") { finish() }
+                }
             }
-            // Otherwise the next move happens on the game screen itself.
+            .padding(.top, 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -169,10 +182,11 @@ struct TutorialView: View {
     private func primaryButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.headline)
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 8)
         }
         .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.capsule)
         .tint(.primary)
         .foregroundStyle(Color(uiColor: .systemBackground))
     }
@@ -184,6 +198,24 @@ struct TutorialView: View {
         } else {
             dismiss()
         }
+    }
+}
+
+/// Offers its content no more than `maxHeight`, then takes the content's own size
+/// (unlike `.frame(maxHeight:)`, which grows to fill whatever it's offered up to the limit).
+private struct HeightCap: Layout {
+    let maxHeight: CGFloat
+
+    private func capped(_ proposal: ProposedViewSize) -> ProposedViewSize {
+        ProposedViewSize(width: proposal.width, height: min(proposal.height ?? maxHeight, maxHeight))
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        subviews.first?.sizeThatFits(capped(proposal)) ?? .zero
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, proposal: ProposedViewSize(bounds.size))
     }
 }
 
@@ -295,6 +327,8 @@ final class TutorialController: GameSceneDelegate {
 
     private func handle(_ event: GameScene.TutorialEvent) {
         switch event {
+        case .layoutChanged:
+            if let scene = scene { cardFrame = scene.tutorialCardFrame }
         case .armed:
             hint = nil
             armed = true
