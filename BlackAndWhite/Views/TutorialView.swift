@@ -382,5 +382,6 @@ final class TutorialController: GameSceneDelegate {
     func gameSceneWantsHighScores(_ scene: GameScene) {}
     func gameSceneWantsRestartConfirmation(_ scene: GameScene) {}
     func gameSceneWantsStart(_ scene: GameScene) {} // The tutorial starts straight away.
+    func gameSceneDidRestart(_ scene: GameScene) {}
     func gameScene(_ scene: GameScene, didEndGameWithScore score: Int, level: Int, abandoned: Bool) {}
 }

@@ -62,7 +62,7 @@ If you use different leaderboard IDs, update `GameCenter.leaderboardID(for:)` to
 
 ### Achievements
 
-27 achievements worth 825 of Game Center's 1,000 points, leaving 175 for adding more later. They're worked out in `Support/Achievements.swift` and don't count in the tutorial. Everything earned on a device is sent again at each Game Center sign-in, so nothing earned while signed out (or before an achievement was set up) is lost. In App Store Connect, under *Services → Game Center → Achievements*, each has the ID `com.chriswilson.blackandwhite.achievement.` followed by the suffix below, an image (1024×1024) and a localisation (title, plus descriptions before and after earning). Add them to the app version before submitting.
+30 achievements worth 905 of Game Center's 1,000 points, leaving 95 for adding more later. They're worked out in `Support/Achievements.swift` and don't count in the tutorial. Everything earned on a device is sent again at each Game Center sign-in, so nothing earned while signed out (or before an achievement was set up) is lost. In App Store Connect, under *Services → Game Center → Achievements*, each has the ID `com.chriswilson.blackandwhite.achievement.` followed by the suffix below, an image (1024×1024) and a localisation (title, plus descriptions before and after earning). Add them to the app version before submitting.
 
 | ID suffix | Title | Description | Points |
 | --- | --- | --- | --- |
@@ -89,10 +89,13 @@ If you use different leaderboard IDs, update `GameCenter.leaderboardID(for:)` to
 | `photoFinish` | Photo Finish | Win with under a second left | 10 |
 | `noTapsNeeded` | Hands Free | Win a round without tapping a square or using a power-up | 10 |
 | `oneTapWonder` | One Tap Wonder | Win a round with a single tap and no power-ups | 20 |
+| `hatTrick` | Triple Clean | Leave no white squares on three rounds in a row in one game | 40 |
+| `marathon` | Marathon | Play 100 games to the end (shows progress; restarted games don't count) | 20 |
 | `goodbyeStar` | Goodbye Star | **Hidden.** Destroy a star by tapping its square | 10 |
 | `score0` | Sweet Nothing | **Hidden.** End a game with a score of zero or less | 20 |
 | `zero` | Zero In | **Hidden.** Score exactly zero in a level | 20 |
 | `goingDown` | Going Down | **Hidden.** Score below zero in a level | 20 |
+| `lockdown` | Lockdown | **Hidden.** Lock every square on the grid | 20 |
 
 Points and titles here match App Store Connect, where they're set; the code only needs the IDs to match.
 

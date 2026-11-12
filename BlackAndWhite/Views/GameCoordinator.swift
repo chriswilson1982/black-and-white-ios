@@ -53,16 +53,23 @@ final class GameCoordinator: GameSceneDelegate {
     @ObservationIgnored private var started = false
     /// Settings asked to return to the title screen when it closes.
     @ObservationIgnored private var returnToTitleAfterSettings = false
+    /// Settings was opened during a game: the difficulty is locked, and closing it carries on
+    /// with the game instead of starting a new one.
+    var settingsDuringGame = false
 
     init() {
         settings = GameSettings.load()
         SoundEngine.shared.enabled = settings.soundEnabled
+        MusicPlayer.shared.enabled = settings.musicEnabled
+        MusicPlayer.shared.level = settings.musicVolume
     }
 
     /// Called once the app appears: signs in to Game Center, and on first launch shows the tutorial.
     func start() {
         guard !started else { return }
         started = true
+        // Load the music now, so it starts cleanly when the first game does.
+        MusicPlayer.shared.prepare()
         if !settings.hasSeenTutorial {
             tutorialStartsGame = true
             showingTutorial = true
@@ -104,6 +111,7 @@ final class GameCoordinator: GameSceneDelegate {
 
     func showSettings() {
         SoundEngine.shared.play(.button)
+        settingsDuringGame = false
         presentedSheet = .settings
         activeSheet = .settings
     }
@@ -187,24 +195,46 @@ final class GameCoordinator: GameSceneDelegate {
             if returnToTitleAfterSettings {
                 // Keep any changes, but leave the game for the title screen rather than restarting.
                 returnToTitleAfterSettings = false
+                settingsDuringGame = false
                 if let newSettings = pendingSettings {
                     pendingSettings = nil
                     settings = newSettings
                     settings.save()
                     SoundEngine.shared.enabled = newSettings.soundEnabled
+                    MusicPlayer.shared.enabled = newSettings.musicEnabled
+                    MusicPlayer.shared.level = newSettings.musicVolume
                     scene?.updateTheme(effectiveSettings)
                 }
                 returnToTitle()
                 return
             }
-            // As in the original, leaving settings always starts a fresh game.
+            if settingsDuringGame {
+                // Mid-game: keep playing, with any new colours, sounds or music applied in place
+                // (the difficulty couldn't be changed).
+                settingsDuringGame = false
+                if let newSettings = pendingSettings {
+                    pendingSettings = nil
+                    settings = newSettings
+                    settings.save()
+                    SoundEngine.shared.enabled = newSettings.soundEnabled
+                    MusicPlayer.shared.enabled = newSettings.musicEnabled
+                    MusicPlayer.shared.level = newSettings.musicVolume
+                    scene?.updateTheme(effectiveSettings)
+                }
+                scene?.setHeld(false)
+                return
+            }
+            // Between games, as in the original, leaving settings starts a fresh game.
             if let newSettings = pendingSettings {
                 pendingSettings = nil
                 settings = newSettings
                 settings.save()
                 SoundEngine.shared.enabled = newSettings.soundEnabled
+                MusicPlayer.shared.enabled = newSettings.musicEnabled
+                MusicPlayer.shared.level = newSettings.musicVolume
                 scene?.apply(settings: effectiveSettings)
-            } else {
+            } else if scene?.awaitingStart != true {
+                // (Already waiting at the start card: nothing to set up again.)
                 scene?.startNewGame()
             }
         case .highScores, .help:
@@ -220,6 +250,9 @@ final class GameCoordinator: GameSceneDelegate {
 
     /// Leaves the game for the title screen. The game waits, paused; Play starts a fresh one.
     private func returnToTitle() {
+        // Leaving the game ends the music, with its outro as on game over; the next game's
+        // Start brings it back from the intro.
+        MusicPlayer.shared.playOutro()
         scene?.setHeld(true)
         roundSummary = nil
         gameOverSummary = nil
@@ -239,6 +272,7 @@ final class GameCoordinator: GameSceneDelegate {
     // MARK: GameSceneDelegate
 
     func gameSceneWantsSettings(_ scene: GameScene) {
+        settingsDuringGame = scene.isGameInProgress
         presentedSheet = .settings
         activeSheet = .settings
     }
@@ -275,6 +309,8 @@ final class GameCoordinator: GameSceneDelegate {
 
     func gameScene(_ scene: GameScene, didEndGameWithScore score: Int, level: Int, abandoned: Bool) {
         GameCenter.shared.submit(score: score, difficulty: settings.difficulty)
+        // A game over plays the music's outro (a restart does too, via `gameSceneDidRestart`).
+        if !abandoned { MusicPlayer.shared.playOutro() }
         let isPersonalBest = scores.record(name: gameCenterAlias ?? settings.username, score: score,
                                            difficulty: settings.difficulty)
         // A restart part-way through goes straight into a new game, so no summary.
@@ -294,6 +330,12 @@ final class GameCoordinator: GameSceneDelegate {
         }
     }
 
+    func gameSceneDidRestart(_ scene: GameScene) {
+        // The game ended early: the music finishes with its outro, as on game over, and the
+        // next Start brings it back from the intro.
+        MusicPlayer.shared.playOutro()
+    }
+
     func gameSceneWantsStart(_ scene: GameScene) {
         gameOverSummary = nil
         let prompt = StartPrompt(difficulty: settings.difficulty,
@@ -306,6 +348,8 @@ final class GameCoordinator: GameSceneDelegate {
         guard startPrompt != nil else { return }
         SoundEngine.shared.play(.button)
         withAnimation(.easeIn(duration: 0.3)) { startPrompt = nil }
+        // From the intro again, if the last game's outro has played.
+        MusicPlayer.shared.start()
         scene?.beginNewGame()
     }
 

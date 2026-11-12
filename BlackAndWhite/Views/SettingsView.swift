@@ -4,17 +4,26 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @State private var draft: GameSettings
+    /// The music volume when Settings opened, restored if the player cancels (the slider
+    /// changes the music live so it can be judged by ear).
+    private let originalMusicVolume: Float
+    @State private var saved = false
     private let onSave: (GameSettings) -> Void
     /// Leaves the game for the title screen. Nil when Settings was opened from the title screen.
     private let onReturnToTitle: (() -> Void)?
     /// The player is signed in to Game Center.
     private let gameCenterAvailable: Bool
+    /// Opened during a game: the difficulty can't change until the game ends.
+    private let difficultyLocked: Bool
 
     init(settings: GameSettings, onSave: @escaping (GameSettings) -> Void,
-         gameCenterAvailable: Bool = false, onReturnToTitle: (() -> Void)? = nil) {
+         gameCenterAvailable: Bool = false, difficultyLocked: Bool = false,
+         onReturnToTitle: (() -> Void)? = nil) {
         _draft = State(initialValue: settings)
+        originalMusicVolume = settings.musicVolume
         self.onSave = onSave
         self.gameCenterAvailable = gameCenterAvailable
+        self.difficultyLocked = difficultyLocked
         self.onReturnToTitle = onReturnToTitle
     }
 
@@ -32,10 +41,15 @@ struct SettingsView: View {
                     .controlSize(.large)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets())
+                    .disabled(difficultyLocked)
                 } header: {
                     Text("Difficulty")
                 } footer: {
-                    Text(difficultySummary)
+                    if difficultyLocked {
+                        Text("You can change the difficulty once this game is over, or after restarting.")
+                    } else {
+                        Text(difficultySummary)
+                    }
                 }
 
                 Section {
@@ -80,6 +94,19 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("Sound effects", isOn: $draft.soundEnabled)
+                    Toggle("Music", isOn: $draft.musicEnabled)
+                    HStack(spacing: 12) {
+                        Image(systemName: "speaker.fill")
+                            .foregroundStyle(.secondary)
+                        Slider(value: $draft.musicVolume, in: 0...1)
+                            .accessibilityLabel("Music volume")
+                        Image(systemName: "speaker.wave.3.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .disabled(!draft.musicEnabled)
+                    .onChange(of: draft.musicVolume) { _, volume in
+                        MusicPlayer.shared.level = volume
+                    }
                 }
 
                 if gameCenterAvailable {
@@ -111,6 +138,7 @@ struct SettingsView: View {
                 if let onReturnToTitle = onReturnToTitle {
                     Section {
                         Button {
+                            saved = true
                             onSave(draft)
                             onReturnToTitle()
                             dismiss()
@@ -121,6 +149,14 @@ struct SettingsView: View {
                         Text("Saves your settings and leaves this game.")
                     }
                 }
+
+                // Credit for the music (not required by its licence, but deserved).
+                Section {
+                } footer: {
+                    Text("Music: [On Synthwave by Janevo](https://janevo.itch.io/synthwave-retrowave-music-pack)")
+                        .frame(maxWidth: .infinity)
+                        .multilineTextAlignment(.center)
+                }
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -130,12 +166,18 @@ struct SettingsView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
+                        saved = true
                         onSave(draft)
                         dismiss()
                     }
                     .bold()
                 }
             }
+        }
+        // Closed without saving (Cancel or a swipe down): undo the live volume change. On the
+        // whole sheet, so opening the tutorial or help from here doesn't count as closing.
+        .onDisappear {
+            if !saved { MusicPlayer.shared.level = originalMusicVolume }
         }
     }
 

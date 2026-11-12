@@ -31,9 +31,12 @@ struct HelpView: View {
                     row("square.lefthalf.filled", "Flip one square without flipping those around it.")
                 }
                 
-                Text("Black & White was created by Chris Wilson. It was originally written in Python using [Pythonista](https://apps.apple.com/gb/app/pythonista-3/id1085978097). The original repository can be found on [GitHub](https://github.com/chriswilson1982/black-and-white)")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Black & White was created by Chris Wilson. It was originally written in Python using [Pythonista](https://apps.apple.com/gb/app/pythonista-3/id1085978097). The original repository can be found on [GitHub](https://github.com/chriswilson1982/black-and-white)")
+                    Text("Music: [On Synthwave by Janevo](https://janevo.itch.io/synthwave-retrowave-music-pack)")
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
             }
             .padding()
         }

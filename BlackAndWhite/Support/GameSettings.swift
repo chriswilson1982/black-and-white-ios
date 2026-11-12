@@ -91,6 +91,10 @@ struct GameSettings: Codable, Equatable {
     /// Colour of the bonus star.
     var starColor = RGBA(1, 0.8, 0)
     var soundEnabled = true
+    /// The background music track (separate from sound effects).
+    var musicEnabled = true
+    /// Music loudness from 0 (silent) to 1 (loudest); see `MusicPlayer.level`.
+    var musicVolume: Float = 0.5
     var hasChosenName = false
     var hasSeenTutorial = false
     var appearance: ColorTheme = .system
@@ -101,7 +105,7 @@ struct GameSettings: Codable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case difficulty, username, whiteText, background, lockColor, pathColor, starColor
-        case soundEnabled, hasChosenName, hasSeenTutorial, appearance, roundedSquares
+        case soundEnabled, musicEnabled, musicVolume, hasChosenName, hasSeenTutorial, appearance, roundedSquares
     }
 
     static let lightBackground = RGBA(1, 1, 1)
@@ -178,6 +182,8 @@ extension GameSettings {
         pathColor = try c.decodeIfPresent(RGBA.self, forKey: .pathColor) ?? pathColor
         starColor = try c.decodeIfPresent(RGBA.self, forKey: .starColor) ?? starColor
         soundEnabled = try c.decodeIfPresent(Bool.self, forKey: .soundEnabled) ?? soundEnabled
+        musicEnabled = try c.decodeIfPresent(Bool.self, forKey: .musicEnabled) ?? musicEnabled
+        musicVolume = try c.decodeIfPresent(Float.self, forKey: .musicVolume) ?? musicVolume
         hasChosenName = try c.decodeIfPresent(Bool.self, forKey: .hasChosenName) ?? hasChosenName
         hasSeenTutorial = try c.decodeIfPresent(Bool.self, forKey: .hasSeenTutorial) ?? hasSeenTutorial
         roundedSquares = try c.decodeIfPresent(Bool.self, forKey: .roundedSquares) ?? roundedSquares

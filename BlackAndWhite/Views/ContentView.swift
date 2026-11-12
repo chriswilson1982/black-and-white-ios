@@ -6,6 +6,7 @@ struct ContentView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.displayScale) private var displayScale
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     /// Frame rate, draw calls, quads and node count in the bottom corner, for performance checks.
     /// Debug builds only: release builds never show them.
@@ -104,6 +105,14 @@ struct ContentView: View {
         .onChange(of: showsAccessPoint, initial: true) { _, visible in
             GameCenter.shared.setAccessPointVisible(visible)
         }
+        // The music pauses in the background and carries on where it left off.
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .background: MusicPlayer.shared.pauseForBackground()
+            case .active: MusicPlayer.shared.resumeFromBackground()
+            default: break
+            }
+        }
         .sheet(item: $coordinator.activeSheet, onDismiss: { coordinator.sheetDismissed() }) { sheet in
             Group {
                 switch sheet {
@@ -111,6 +120,7 @@ struct ContentView: View {
                     SettingsView(settings: coordinator.settings,
                                  onSave: { coordinator.pendingSettings = $0 },
                                  gameCenterAvailable: coordinator.gameCenterReady,
+                                 difficultyLocked: coordinator.settingsDuringGame,
                                  // Only offered from a game; on the title screen there's nowhere to return to.
                                  onReturnToTitle: coordinator.showingHome ? nil : { coordinator.requestReturnToTitle() })
                 case .highScores:

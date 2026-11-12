@@ -123,14 +123,17 @@ final class SoundEngine {
         player.play()
     }
 
-    private func configureIfNeeded() {
-        guard !isConfigured else { return }
-        isConfigured = true
-        // Ambient: respects the silent switch and mixes with the player's music.
+    private static var sessionConfigured = false
+
+    /// Sets up the app's audio session, once (shared with the music player).
+    /// Ambient: respects the silent switch and mixes with the player's own music.
+    static func configureSessionIfNeeded() {
+        guard !sessionConfigured else { return }
+        sessionConfigured = true
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.ambient)
         // Activating can wait on the system's audio service, so keep it off the main thread
-        // (this runs when the first sound plays, mid-game).
+        // (this can run when the first sound plays, mid-game).
         if #available(iOS 27.0, *) {
             session.activate { _, _ in }
         } else {
@@ -138,6 +141,12 @@ final class SoundEngine {
                 try? session.setActive(true)
             }
         }
+    }
+
+    private func configureIfNeeded() {
+        guard !isConfigured else { return }
+        isConfigured = true
+        Self.configureSessionIfNeeded()
 
         for _ in 0..<8 {
             let player = AVAudioPlayerNode()

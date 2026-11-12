@@ -264,7 +264,8 @@ struct StartPrompt: Identifiable, Equatable {
 }
 
 /// Shown before each new game, so the clock doesn't start until the player is ready.
-/// The grid is dealt when they tap Start (or anywhere).
+/// The grid is dealt when they tap Start. Taps elsewhere reach the game screen, so the
+/// settings and high scores buttons still work.
 struct StartCard: View {
     let prompt: StartPrompt
     /// Resolved settings, for the theme's colours.
@@ -276,7 +277,7 @@ struct StartCard: View {
 
     var body: some View {
         SummaryCardContainer(settings: settings, accessibilityText: accessibilityText,
-                             accessibilityHint: "Starts the game", onDismiss: onStart) {
+                             accessibilityHint: "", onDismiss: nil) {
             VStack(alignment: .leading, spacing: 14) {
                 SummaryCardTitle("New game")
 
@@ -303,6 +304,8 @@ struct StartCard: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 4)
+                .accessibilityLabel("Start")
+                .accessibilityHint("Starts the game")
             }
         }
     }
@@ -333,14 +336,15 @@ struct StartCard: View {
 
 // MARK: - Shared pieces
 
-/// The frosted card both summaries sit on. A tap on it, or anywhere else on screen, dismisses it;
-/// a tap outside doesn't also press whatever is underneath.
+/// The frosted card the summaries sit on. With `onDismiss`, a tap on it or anywhere else on screen
+/// dismisses it, and a tap outside doesn't also press whatever is underneath. Without, only the
+/// card's own buttons respond, and the rest of the screen stays usable.
 private struct SummaryCardContainer<Content: View>: View {
     let settings: GameSettings
-    /// What VoiceOver reads for the whole card, and its hint.
+    /// What VoiceOver reads for the whole card, and its hint (for a card that dismisses on tap).
     let accessibilityText: String
     let accessibilityHint: String
-    let onDismiss: () -> Void
+    let onDismiss: (() -> Void)?
     @ViewBuilder let content: Content
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -352,34 +356,44 @@ private struct SummaryCardContainer<Content: View>: View {
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: isLarge ? 32 : 26, style: .continuous) }
 
     var body: some View {
-        let textColor = Color(uiColor: settings.textColor)
-        ZStack {
-            Color.clear
-                .contentShape(Rectangle())
-                .ignoresSafeArea()
-                .onTapGesture(perform: onDismiss)
-                .accessibilityHidden(true)
-            content
-                .foregroundStyle(textColor)
-                // Larger text on a big screen, or the player's own size if that's larger still.
-                .dynamicTypeSize(isLarge ? .xxxLarge ... .accessibility5 : .xSmall ... .accessibility5)
-                .padding(isLarge ? 30 : 22)
-                .frame(maxWidth: isLarge ? 420 : 320)
-                // Frosted, with a tint of the theme's background: the board shows through softly
-                // while the text stays easy to read.
-                .background {
-                    shape.fill(.ultraThinMaterial)
-                    shape.fill(settings.background.color.opacity(0.6))
-                }
-                .overlay(shape.strokeBorder(textColor.opacity(0.12), lineWidth: 1))
-                .shadow(color: .black.opacity(0.25), radius: 24, y: 10)
-                .contentShape(shape)
-                .onTapGesture(perform: onDismiss)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(accessibilityText)
-                .accessibilityHint(accessibilityHint)
-                .accessibilityAddTraits(.isButton)
+        if let onDismiss = onDismiss {
+            ZStack {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .ignoresSafeArea()
+                    .onTapGesture(perform: onDismiss)
+                    .accessibilityHidden(true)
+                card
+                    .onTapGesture(perform: onDismiss)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(accessibilityText)
+                    .accessibilityHint(accessibilityHint)
+                    .accessibilityAddTraits(.isButton)
+            }
+        } else {
+            // Only the card's own buttons act; the card still blocks taps to whatever is under it.
+            card
+                .accessibilityElement(children: .contain)
         }
+    }
+
+    private var card: some View {
+        let textColor = Color(uiColor: settings.textColor)
+        return content
+            .foregroundStyle(textColor)
+            // Larger text on a big screen, or the player's own size if that's larger still.
+            .dynamicTypeSize(isLarge ? .xxxLarge ... .accessibility5 : .xSmall ... .accessibility5)
+            .padding(isLarge ? 30 : 22)
+            .frame(maxWidth: isLarge ? 420 : 320)
+            // Frosted, with a tint of the theme's background: the board shows through softly
+            // while the text stays easy to read.
+            .background {
+                shape.fill(.ultraThinMaterial)
+                shape.fill(settings.background.color.opacity(0.6))
+            }
+            .overlay(shape.strokeBorder(textColor.opacity(0.12), lineWidth: 1))
+            .shadow(color: .black.opacity(0.25), radius: 24, y: 10)
+            .contentShape(shape)
     }
 }
 

@@ -50,6 +50,8 @@ protocol GameSceneDelegate: AnyObject {
     func gameScene(_ scene: GameScene, didFinishRound summary: RoundSummary)
     /// A new game is ready: show the start card. The scene waits until `beginNewGame()`.
     func gameSceneWantsStart(_ scene: GameScene)
+    /// The player restarted mid-game with the timer button (after confirming, if asked).
+    func gameSceneDidRestart(_ scene: GameScene)
 }
 
 /// Drawing order. The scene ignores sibling order, so every node gets an explicit z.
@@ -203,12 +205,21 @@ final class GameScene: SKScene {
         }
     }
 
+    /// A game is under way, past the point where starting again would lose anything: beyond
+    /// level 1 and not yet over. Settings can still be opened, but not change the difficulty,
+    /// and closing them carries on with the game rather than starting a new one.
+    var isGameInProgress: Bool {
+        !awaitingStart && !(phase == .lost || (level == 1 && (phase == .dealing || phase == .playing)))
+    }
+
+    /// Like the high scores, Settings can't be used to pause the clock in its final seconds.
     private var settingsAvailable: Bool {
-        phase == .lost || (level == 1 && (phase == .dealing || phase == .playing))
+        highScoresAvailable
     }
 
     private var highScoresAvailable: Bool {
-        !(phase == .playing && lowTime)
+        // Always while the start card is up (the last game's final seconds no longer matter).
+        awaitingStart || !(phase == .playing && lowTime)
     }
 
     // MARK: Layout
@@ -342,6 +353,8 @@ final class GameScene: SKScene {
         endGridTracking()
         awaitingStart = true
         clearBoard()
+        // The settings and high scores buttons are available while waiting.
+        applyChromeForPhase()
         gameDelegate?.gameSceneWantsStart(self)
     }
 
@@ -406,6 +419,7 @@ final class GameScene: SKScene {
         if finalScore != 0 {
             gameDelegate?.gameScene(self, didEndGameWithScore: finalScore, level: level, abandoned: true)
         }
+        gameDelegate?.gameSceneDidRestart(self)
         requestNewGame()
     }
 
@@ -655,6 +669,7 @@ final class GameScene: SKScene {
             powerupCounts = Array(repeating: isTutorial ? 3 : settings.difficulty.startingPowerups, count: 3)
             punishNext = false
             usedPowerupsThisGame = false
+            achievements?.gameStarted()
         }
         let punished = punishNext
         punishNext = false
@@ -869,9 +884,19 @@ final class GameScene: SKScene {
     // MARK: Touches
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        // While the start card is up, only its Start button does anything.
-        guard let touch = touches.first, isBuilt, !isHeld, !awaitingStart else { return }
+        guard let touch = touches.first, isBuilt, !isHeld else { return }
         let p = touch.location(in: self)
+
+        // While the start card is up, the grid waits: only the settings and high scores buttons
+        // work (the card's own Start button begins the game).
+        if awaitingStart {
+            if hit(scoresButton, size: CGSize(width: layout.s, height: layout.s), p) {
+                highScoresTapped()
+            } else if hit(settingsButton, size: CGSize(width: layout.s, height: layout.s), p) {
+                settingsTapped()
+            }
+            return
+        }
 
         if isTutorial {
             // Only the step's one allowed tap does anything.
@@ -1018,6 +1043,8 @@ final class GameScene: SKScene {
                 isHeld = true
                 gameDelegate?.gameSceneWantsRestartConfirmation(self)
             } else {
+                // Nothing to lose yet, so no need to ask.
+                gameDelegate?.gameSceneDidRestart(self)
                 requestNewGame()
             }
         case .dealing, .resolving:
@@ -1106,6 +1133,10 @@ final class GameScene: SKScene {
         let hadStar = board.star == p
         let flipped = board.lock(p)
         squareTapsThisRound += 1
+        if board.lockedCount == board.rows * board.cols {
+            // Every square locked: pointless, but it deserves recognition.
+            achievements?.gridFullyLocked()
+        }
         tapHaptic.impactOccurred()
 
         if let node = squares[p] {
