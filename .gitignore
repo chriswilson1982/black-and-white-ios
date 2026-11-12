@@ -17,3 +17,6 @@ DerivedData/
 # Swift Package Manager
 .build/
 .swiftpm/
+
+# Private keys, kept on this Mac only (see BlackAndWhite/Views/PromoBanner.swift)
+BlackAndWhite/Kickstart.plist
