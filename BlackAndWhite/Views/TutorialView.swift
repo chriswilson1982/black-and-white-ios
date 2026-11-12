@@ -5,7 +5,7 @@ import UIKit
 
 /// A short guided tutorial, played on the real game screen with a fixed practice board.
 /// Instruction cards sit on top; the clock is held and only the tap each step asks for works.
-/// Shown on first launch and from Settings.
+/// Opened from the title screen and from Settings.
 struct TutorialView: View {
     let settings: GameSettings
     /// Called when the tutorial ends. If nil, the view dismisses itself (when pushed from Settings).
@@ -129,7 +129,7 @@ struct TutorialView: View {
                     .transition(.opacity)
             }
 
-            // Bottom right: Leave (ends the whole tutorial), then Next or Play. Steps without
+            // Bottom right: Leave (ends the whole tutorial), then Next or Done. Steps without
             // Next wait for a move on the game screen itself.
             HStack(spacing: 12) {
                 Spacer()
@@ -142,7 +142,7 @@ struct TutorialView: View {
                 if let next = tutorial.step.nextOnButton {
                     primaryButton("Next") { tutorial.advance(to: next) }
                 } else if tutorial.step == .ready {
-                    primaryButton("Play") { finish() }
+                    primaryButton("Done") { finish() }
                 }
             }
             .padding(.top, 2)

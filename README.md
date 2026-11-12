@@ -16,7 +16,7 @@ Debug builds show SpriteKit's frame rate, draw call, quad and node counters in t
 
 - **Home screen** with Play, high scores, settings, How to Play and the tutorial, over a moving mesh gradient of the game's colours.
 - **Rounded islands:** in the rounded style, squares of the same colour join into smooth shapes. Corners round off where colours meet, diagonal neighbours join across, and black and locked squares form continuous walls.
-- **Guided tutorial** played on the real game screen with a fixed practice board. Instruction cards sit on top, the clock is held, and only the tap each step asks for works. It runs on first launch and can be replayed from the home screen.
+- **Guided tutorial** played on the real game screen with a fixed practice board. Instruction cards sit on top, the clock is held, and only the tap each step asks for works. It's opened from the home screen (or Settings) whenever the player wants it.
 - **Power-ups:** flip every square, unlock a tapped square, or flip one square on its own.
 - **Bonuses:** no white squares left outside the path, a power-up reward for big rounds, and a bonus star.
 - **Colour schemes** (Classic, Ocean, Sunset, Forest, Neon, Pastel and Accessible, using colour-blind-friendly Okabe–Ito colours), plus pickers for full customisation, light/dark/automatic appearance and a configurable star colour.

@@ -47,9 +47,6 @@ final class GameCoordinator: GameSceneDelegate {
     @ObservationIgnored private var gameCenterAlias: String?
     /// Screen size, safe area and pixel density, kept until the game is created.
     @ObservationIgnored private var layout: (size: CGSize, insets: UIEdgeInsets, displayScale: CGFloat)?
-    /// The first-launch tutorial goes straight into the game when it ends; from the home screen
-    /// it just returns there.
-    @ObservationIgnored private var tutorialStartsGame = false
     @ObservationIgnored private var started = false
     /// Settings asked to return to the title screen when it closes.
     @ObservationIgnored private var returnToTitleAfterSettings = false
@@ -64,16 +61,13 @@ final class GameCoordinator: GameSceneDelegate {
         MusicPlayer.shared.level = settings.musicVolume
     }
 
-    /// Called once the app appears: signs in to Game Center, and on first launch shows the tutorial.
+    /// Called once the app appears: signs in to Game Center. Every launch, the first included,
+    /// opens on the title screen; the tutorial is there for whoever wants it.
     func start() {
         guard !started else { return }
         started = true
         // Load the music now, so it starts cleanly when the first game does.
         MusicPlayer.shared.prepare()
-        if !settings.hasSeenTutorial {
-            tutorialStartsGame = true
-            showingTutorial = true
-        }
         startGameCenter()
     }
 
@@ -130,7 +124,6 @@ final class GameCoordinator: GameSceneDelegate {
 
     func showTutorial() {
         SoundEngine.shared.play(.button)
-        tutorialStartsGame = false
         showingTutorial = true
     }
 
@@ -171,16 +164,10 @@ final class GameCoordinator: GameSceneDelegate {
         showingTutorial = false
     }
 
-    /// Runs after the tutorial has closed.
+    /// Runs after the tutorial has closed, back on the title screen.
     func tutorialDismissed() {
         settings.hasSeenTutorial = true
         settings.save()
-        // After the first-launch tutorial its Play button goes straight into a game;
-        // from the home screen it just returns there.
-        if tutorialStartsGame {
-            tutorialStartsGame = false
-            play()
-        }
     }
 
     func showGameCenterLeaderboard(for difficulty: Difficulty) {
