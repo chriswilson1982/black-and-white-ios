@@ -1,0 +1,112 @@
+:root {
+  --path: #00e600;
+  --lock: #ff2600;
+  --text: #111;
+  --muted: #666;
+  --bg: #fafafa;
+  --card: #fff;
+  --line: rgba(0, 0, 0, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #f2f2f2;
+    --muted: #aaa;
+    --bg: #111;
+    --card: #1c1c1e;
+    --line: rgba(255, 255, 255, 0.12);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.55;
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 48px 24px 32px;
+}
+
+a { color: inherit; }
+
+/* Title: "black&white" with a bold ampersand, as in the game. */
+.title {
+  font-size: clamp(2.6rem, 9vw, 4rem);
+  font-weight: 300;
+  letter-spacing: -0.01em;
+  margin: 16px 0 4px;
+  text-align: center;
+}
+.title b { font-weight: 800; }
+
+.tagline {
+  text-align: center;
+  font-size: 1.25rem;
+  color: var(--muted);
+  margin: 0 0 32px;
+}
+
+.icon {
+  display: block;
+  width: 160px;
+  height: 160px;
+  margin: 0 auto;
+}
+
+.cta {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 48px;
+}
+
+.button {
+  display: inline-block;
+  padding: 14px 28px;
+  border-radius: 999px;
+  background: #000;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 5px var(--path);
+}
+
+section {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 24px 28px;
+  margin: 0 0 20px;
+}
+
+h2 { margin: 0 0 8px; font-size: 1.3rem; }
+h3 { margin: 20px 0 4px; font-size: 1.05rem; }
+
+ul { padding-left: 1.2em; margin: 8px 0 0; }
+li { margin: 4px 0; }
+
+.swatch {
+  display: inline-block;
+  width: 0.8em;
+  height: 0.8em;
+  border-radius: 0.2em;
+  vertical-align: -0.05em;
+  margin-right: 0.3em;
+}
+
+footer {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 8px 24px 40px;
+}
+footer a { margin: 0 8px; }
+
+.back { display: inline-block; margin-bottom: 16px; color: var(--muted); }
