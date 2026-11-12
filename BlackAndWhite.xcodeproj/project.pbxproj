@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		B4A1E000000000000000001C /* KickstartExchange in Frameworks */ = {isa = PBXBuildFile; productRef = B4A1E000000000000000001D /* KickstartExchange */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		B4A1E0000000000000000017 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -40,6 +44,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B4A1E000000000000000001C /* KickstartExchange in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -92,6 +97,7 @@
 			);
 			name = BlackAndWhite;
 			packageProductDependencies = (
+				B4A1E000000000000000001D /* KickstartExchange */,
 			);
 			productName = BlackAndWhite;
 			productReference = B4A1E0000000000000000001 /* BlackAndWhite.app */;
@@ -148,6 +154,9 @@
 			);
 			mainGroup = B4A1E0000000000000000004;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B4A1E000000000000000001E /* XCRemoteSwiftPackageReference "KickstartSDK" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B4A1E0000000000000000005 /* Products */;
 			projectDirPath = "";
@@ -444,6 +453,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B4A1E000000000000000001E /* XCRemoteSwiftPackageReference "KickstartSDK" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/twostraws/KickstartSDK";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 0.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B4A1E000000000000000001D /* KickstartExchange */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B4A1E000000000000000001E /* XCRemoteSwiftPackageReference "KickstartSDK" */;
+			productName = KickstartExchange;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = B4A1E0000000000000000009 /* Project object */;
 }

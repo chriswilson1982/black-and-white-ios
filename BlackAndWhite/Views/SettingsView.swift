@@ -150,8 +150,11 @@ struct SettingsView: View {
                     }
                 }
 
-                // The same credits as How to Play: the game and its music.
+                // A banner for another indie app, then the same credits as How to Play.
                 Section {
+                    PromoBanner()
+                        .listRowInsets(EdgeInsets(top: 2, leading: 2, bottom: 2, trailing: 2))
+                        .listRowBackground(Color.clear)
                 } footer: {
                     Credits()
                         // Section footers are otherwise upper-cased on some styles.

@@ -30,7 +30,9 @@ struct HelpView: View {
                     row("xmark", "Unlock a square you tapped.")
                     row("square.lefthalf.filled", "Flip one square without flipping those around it.")
                 }
-                
+
+                // A banner for another indie app, then the credits.
+                PromoBanner()
                 Credits()
             }
             .padding()
