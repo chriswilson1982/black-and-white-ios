@@ -31,12 +31,7 @@ struct HelpView: View {
                     row("square.lefthalf.filled", "Flip one square without flipping those around it.")
                 }
                 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Black & White was created by Chris Wilson. It was originally written in Python using [Pythonista](https://apps.apple.com/gb/app/pythonista-3/id1085978097). The original repository can be found on [GitHub](https://github.com/chriswilson1982/black-and-white)")
-                    Text("Music: [On Synthwave by Janevo](https://janevo.itch.io/synthwave-retrowave-music-pack)")
-                }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                Credits()
             }
             .padding()
         }
@@ -62,5 +57,18 @@ struct HelpView: View {
             Text(LocalizedStringKey(text))
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+}
+
+/// Who made the game and its music, with links. Shown at the end of How to Play and Settings.
+struct Credits: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Black & White was created by Chris Wilson. It was originally written in Python using [Pythonista](https://apps.apple.com/gb/app/pythonista-3/id1085978097). The original repository can be found on [GitHub](https://github.com/chriswilson1982/black-and-white)")
+            Text("Music: [On Synthwave by Janevo](https://janevo.itch.io/synthwave-retrowave-music-pack)")
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

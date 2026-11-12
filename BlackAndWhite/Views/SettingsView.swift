@@ -150,12 +150,12 @@ struct SettingsView: View {
                     }
                 }
 
-                // Credit for the music (not required by its licence, but deserved).
+                // The same credits as How to Play: the game and its music.
                 Section {
                 } footer: {
-                    Text("Music: [On Synthwave by Janevo](https://janevo.itch.io/synthwave-retrowave-music-pack)")
-                        .frame(maxWidth: .infinity)
-                        .multilineTextAlignment(.center)
+                    Credits()
+                        // Section footers are otherwise upper-cased on some styles.
+                        .textCase(nil)
                 }
             }
             .navigationTitle("Settings")
