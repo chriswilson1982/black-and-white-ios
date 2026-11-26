@@ -82,6 +82,13 @@ struct HighScoresView: View {
                         Text("Games with a score above zero, played on this device.")
                     }
                 }
+
+                // A banner for another indie app, as at the bottom of Settings.
+                Section {
+                    PromoBanner()
+                        .listRowInsets(EdgeInsets(top: 2, leading: 2, bottom: 2, trailing: 2))
+                        .listRowBackground(Color.clear)
+                }
             }
             .navigationTitle("High Scores")
             .navigationBarTitleDisplayMode(.inline)

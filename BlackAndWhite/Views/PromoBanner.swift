@@ -3,7 +3,7 @@ import SwiftUI
 
 /// A banner for another indie app, from Kickstart Exchange: free, privacy-conscious
 /// cross-promotion that matches apps, not people (see the privacy policy). Shown at the
-/// bottom of Settings and How to Play, out of the way of the game itself.
+/// bottom of Settings, How to Play and High Scores, out of the way of the game itself.
 struct PromoBanner: View {
     /// The app's Kickstart Exchange API key (from exchange.kickstart.tools), read from
     /// `Kickstart.plist` ("ExchangeAPIKey"). That file is kept out of Git, so the key isn't
